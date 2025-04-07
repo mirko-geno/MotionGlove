@@ -4,7 +4,7 @@
 use defmt::*;
 use {defmt_rtt as _, panic_probe as _};
 use embassy_executor::Spawner;
-use embassy_time::{Delay, Duration, Timer};
+use embassy_time::Delay;
 use embassy_rp::{
     bind_interrupts,
     gpio::{Level, Output},
@@ -19,59 +19,22 @@ use static_cell::StaticCell;
 
 use mpu6050_async::*;
 
+use mape_2025::{
+    usb_logger::logger_task,
+    blinker::blink_task,
+    mpu::read_mpu,
+};
+
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => pio::InterruptHandler<PIO0>;
     I2C0_IRQ => i2c::InterruptHandler<I2C0>;
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
 });
 
-const DELAY: embassy_time::Duration = Duration::from_secs(1);
-
 
 #[embassy_executor::task]
 async fn cyw43_task(runner: cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO0, 0, DMA_CH0>>) -> ! {
     runner.run().await
-}
-
-
-#[embassy_executor::task]
-async fn logger_task(driver: Driver<'static, USB>) {
-    embassy_usb_logger::run!(1024, log::LevelFilter::Info, driver);
-}
-
-
-#[embassy_executor::task]
-async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
-    loop {
-        // get roll and pitch estimate
-        let acc = mpu.get_acc_angles().await.unwrap();
-        log::info!("r/p: {:?}", acc);
-
-        // get temp
-        let temp = mpu.get_temp().await.unwrap();
-        log::info!("temp: {:?}c", temp);
-
-        // get gyro data, scaled with sensitivity
-        let gyro = mpu.get_gyro().await.unwrap();
-        log::info!("gyro: {:?}", gyro);
-
-        // get accelerometer data, scaled with sensitivity
-        let acc = mpu.get_acc().await.unwrap();
-        log::info!("acc: {:?}", acc);
-
-        Timer::after(Duration::from_secs(1)).await;
-    }
-}
-
-#[embassy_executor::task]
-async fn blink_task(mut control: cyw43::Control<'static>) -> ! {
-    loop {
-        control.gpio_set(0, true).await;
-        Timer::after(DELAY).await;
-
-        control.gpio_set(0, false).await;
-        Timer::after(DELAY).await;
-    }
 }
 
 
