@@ -7,16 +7,28 @@ use embassy_rp::{
 use mpu6050_async::*;
 
 
+async fn _calibrate_gyro(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> (f64, f64, f64) {
+    let mut x_reg: [f32; 100];
+    let mut y_reg: [f32; 100];
+    let mut z_reg: [f32; 100];
+
+    let (x, y, z) = mpu.get_gyro().await.unwrap();
+    x_reg.concat(x);
+
+    
+    
+
+
+    return (1.0, 2.1, 3.2);
+}
+
+
 #[embassy_executor::task]
 pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
     loop {
         // get roll and pitch estimate
         let acc = mpu.get_acc_angles().await.unwrap();
-        log::info!("r/p: {:?}", acc);
-
-        // get temp
-        let temp = mpu.get_temp().await.unwrap();
-        log::info!("temp: {:?}c", temp);
+        log::info!("roll/pitch: {:?}", acc);
 
         // get gyro data, scaled with sensitivity
         let gyro = mpu.get_gyro().await.unwrap();
@@ -26,6 +38,6 @@ pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
         let acc = mpu.get_acc().await.unwrap();
         log::info!("acc: {:?}", acc);
 
-        Timer::after(Duration::from_secs(1)).await;
+        Timer::after(Duration::from_millis(10)).await;
     }
 }
