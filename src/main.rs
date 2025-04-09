@@ -73,7 +73,7 @@ async fn main(spawner: Spawner) {
 
     control.init(clm).await;
     control
-        .set_power_management(cyw43::PowerManagementMode::PowerSave) // Use cyw43::PowerManagementMode::Disabled if too much latency
+        .set_power_management(cyw43::PowerManagementMode::PowerSave) // Use cyw43::PowerManagementMode::None if too much latency
         .await;
     
     unwrap!(spawner.spawn(logger_task(driver)));
