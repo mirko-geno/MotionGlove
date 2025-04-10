@@ -22,6 +22,7 @@ async fn calibrate_gyro(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> (f
         Timer::after(delay).await;
     }
 
+    // Returning the average values
     (x_reg/cali_params, y_reg/cali_params, z_reg/cali_params)
 }
 
