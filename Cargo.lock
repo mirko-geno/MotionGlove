@@ -915,9 +915,9 @@ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
 
 [[package]]
 name = "libm"
-version = "0.2.11"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8355be11b20d696c8f18f6cc018c4e372165b1fa8126cef092399c9951984ffa"
+checksum = "c9627da5196e5d8ed0b0495e61e518847578da83483c37288316d9b2e03a7f72"
 
 [[package]]
 name = "litrs"
@@ -957,7 +957,7 @@ dependencies = [
  "embassy-time",
  "embassy-usb-logger",
  "log",
- "mpu6050-async",
+ "mpu6050-dmp",
  "panic-probe",
  "portable-atomic",
  "static_cell",
@@ -970,9 +970,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
-name = "mpu6050-async"
-version = "0.0.2"
-source = "git+https://github.com/kalkyl/mpu6050-async.git#4861c61f16fb5777b8b12203f6a100ed4c2e4923"
+name = "mpu6050-dmp"
+version = "0.6.0"
+source = "git+https://github.com/barafael/mpu6050-dmp-rs.git#dd820af0a4f25caa8b4b4fc9196b3bc4ef3060ba"
 dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",

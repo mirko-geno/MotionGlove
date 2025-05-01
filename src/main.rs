@@ -4,7 +4,6 @@
 use defmt::*;
 use {defmt_rtt as _, panic_probe as _};
 use embassy_executor::Spawner;
-use embassy_time::Delay;
 use embassy_rp::{
     bind_interrupts,
     gpio::{Level, Output},
@@ -17,7 +16,7 @@ use cyw43_pio::{PioSpi, DEFAULT_CLOCK_DIVIDER};
 
 use static_cell::StaticCell;
 
-use mpu6050_async::*;
+use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
 
 use mape_2025::{
     usb_logger::logger_task,
@@ -63,8 +62,7 @@ async fn main(spawner: Spawner) {
     let config = i2c::Config::default();
     let bus = I2c::new_async(p.I2C0, scl, sda, Irqs, config);
 
-    let mut mpu = Mpu6050::new(bus);
-    mpu.init(&mut Delay).await.unwrap();
+    let mpu = Mpu6050::new(bus, Address::default()).await.unwrap();
 
     static STATE: StaticCell<cyw43::State> = StaticCell::new();
     let state = STATE.init(cyw43::State::new());

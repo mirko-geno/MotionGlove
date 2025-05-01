@@ -1,49 +1,68 @@
 use {defmt_rtt as _, panic_probe as _};
-use embassy_time::{Duration, Timer};
+use embassy_time::{Timer, Delay};
 use embassy_rp::{
     peripherals::I2C0, 
     i2c::{self, I2c},
 };
-use mpu6050_async::*;
+use mpu6050_dmp::{
+    sensor_async::Mpu6050,
+    calibration::CalibrationParameters,
+    quaternion::Quaternion,
+};
 
 
-async fn calibrate_gyro(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> (f32, f32, f32) {
-    let delay = Duration::from_millis(10);
-    let cali_params = 1000.0;
-    let mut x_reg: f32 = 0.0; 
-    let mut y_reg: f32 = 0.0;
-    let mut z_reg: f32 = 0.0;
+async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
+    let calibration_params = CalibrationParameters::new(
+        mpu6050_dmp::accel::AccelFullScale::G2,
+        mpu6050_dmp::gyro::GyroFullScale::Deg2000,
+        mpu6050_dmp::calibration::ReferenceGravity::ZN,
+    );
 
-    for _ in 1..(cali_params as i32) {
-        let (x, y, z) = mpu.get_gyro().await.unwrap();
-        x_reg += x;
-        y_reg += y;
-        z_reg += z;
-        Timer::after(delay).await;
-    }
-
-    // Returning the average values
-    (x_reg/cali_params, y_reg/cali_params, z_reg/cali_params)
+    log::info!("Calibrating Sensor");
+    mpu.calibrate(&mut Delay, &calibration_params).await.unwrap();
+    log::info!("Sensor Calibrated");
 }
 
 
 #[embassy_executor::task]
 pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
-    let cali_error = calibrate_gyro(&mut mpu).await;
+    // Initialize DMP
+    log::info!("Initializing DMP");
+    mpu.initialize_dmp(&mut Delay).await.unwrap();
+
+    // Calibrate sensor
+    calibrate_sensor(&mut mpu).await;
+
+    // Configure DMP update rate
+    mpu.set_sample_rate_divider(9).await.unwrap(); // 100Hz
+    log::info!("Sample rate configured");
+
+
+    // Enable FIFO for quaternion data
+    mpu.enable_fifo().await.unwrap();
+    // Buffer for FIFO data (DMP packets are 28 bytes)
+    let mut buffer = [0u8; 28];
+
+    // Main loop reading quaternion data
     loop {
-        // get roll and pitch estimate
-        let acc = mpu.get_acc_angles().await.unwrap();
-        log::info!("roll/pitch: {:?}", acc);
+        let fifo_count = mpu.get_fifo_count().await.unwrap();
 
-        // get gyro data, scaled with sensitivity
-        let gyro = mpu.get_gyro().await.unwrap();
-        let calibrated_gyro = (gyro.0 - cali_error.0, gyro.1 - cali_error.1, gyro.2 - cali_error.2);
-        log::info!("gyro: {:?}", calibrated_gyro);
+        if fifo_count >= 28 {
+            // Read a complete DMP packet
+            let data = mpu.read_fifo(&mut buffer).await.unwrap();
 
-        // get accelerometer data, scaled with sensitivity
-        let acc = mpu.get_acc().await.unwrap();
-        log::info!("acc: {:?}", acc);
+            // First 16 bytes contain quaternion data
+            // The quaternion represents the sensor's orientation in 3D space:
+            // - w: cos(angle/2) - indicates amount of rotation
+            // - i,j,k: axis * sin(angle/2) - indicates rotation axis
+            let quat = Quaternion::from_bytes(&data[..16]).unwrap().normalize();
 
-        Timer::after(Duration::from_millis(10)).await;
+            // Display quaternion components
+            // Values are normalized (sum of squares = 1)
+            log::info!("\nQuaternion: w={}, i={}, j={}, k={}",quat.w, quat.x, quat.y, quat.z);
+        }
+
+        Timer::after_millis(300).await;
     }
 }
+

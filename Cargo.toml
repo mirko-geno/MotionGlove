@@ -29,7 +29,10 @@ portable-atomic = { version = "1.5", features = ["critical-section"] }
 log = "0.4"
 
 
-mpu6050-async = { git = "https://github.com/kalkyl/mpu6050-async.git" }
+mpu6050-dmp = { git = "https://github.com/barafael/mpu6050-dmp-rs.git", features = ["async"]}
+
+
+
 
 
 [profile.release]
