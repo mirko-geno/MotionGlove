@@ -1,13 +1,13 @@
 use {defmt_rtt as _, panic_probe as _};
 use embassy_time::{Duration, Timer};
 use embassy_rp::{
-    peripherals::I2C0, 
+    peripherals::I2C1, 
     i2c::{self, I2c},
 };
 use mpu6050_async::*;
 
 
-async fn calibrate_gyro(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> (f32, f32, f32) {
+async fn calibrate_gyro(mpu: &mut Mpu6050<I2c<'static, I2C1, i2c::Async>>) -> (f32, f32, f32) {
     let delay = Duration::from_millis(10);
     let cali_params = 1000.0;
     let mut x_reg: f32 = 0.0; 
@@ -28,22 +28,23 @@ async fn calibrate_gyro(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> (f
 
 
 #[embassy_executor::task]
-pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
+pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C1, i2c::Async>>) -> ! {
     let cali_error = calibrate_gyro(&mut mpu).await;
     loop {
         // get roll and pitch estimate
-        let acc = mpu.get_acc_angles().await.unwrap();
-        log::info!("roll/pitch: {:?}", acc);
+        let rad_roll_pitch = mpu.get_acc_angles().await.unwrap();
+        let deg_roll_pitch = (rad_roll_pitch.0 * 180.0 / PI, rad_roll_pitch.1 * 180.0 /PI);
+        log::info!("roll/pitch: {:?}", deg_roll_pitch);
 
         // get gyro data, scaled with sensitivity
         let gyro = mpu.get_gyro().await.unwrap();
         let calibrated_gyro = (gyro.0 - cali_error.0, gyro.1 - cali_error.1, gyro.2 - cali_error.2);
-        log::info!("gyro: {:?}", calibrated_gyro);
+        // log::info!("gyro: {:?}", gyro);
 
         // get accelerometer data, scaled with sensitivity
         let acc = mpu.get_acc().await.unwrap();
-        log::info!("acc: {:?}", acc);
+        // log::info!("acc: {:?}", acc);
 
-        Timer::after(Duration::from_millis(10)).await;
+        Timer::after(Duration::from_millis(500)).await;
     }
 }
