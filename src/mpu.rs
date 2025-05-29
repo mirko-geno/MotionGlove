@@ -1,7 +1,7 @@
 use {defmt_rtt as _, panic_probe as _};
 use embassy_time::{Timer, Delay};
 use embassy_rp::{
-    peripherals::I2C0, 
+    peripherals::I2C1, 
     i2c::{self, I2c},
 };
 use mpu6050_dmp::{
@@ -11,11 +11,11 @@ use mpu6050_dmp::{
 };
 
 
-async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
+async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C1, i2c::Async>>) {
     let calibration_params = CalibrationParameters::new(
-        mpu6050_dmp::accel::AccelFullScale::G2,
+        mpu6050_dmp::accel::AccelFullScale::G4,
         mpu6050_dmp::gyro::GyroFullScale::Deg2000,
-        mpu6050_dmp::calibration::ReferenceGravity::ZN,
+        mpu6050_dmp::calibration::ReferenceGravity::XP,
     );
 
     log::info!("Calibrating Sensor");
@@ -25,7 +25,7 @@ async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
 
 
 #[embassy_executor::task]
-pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
+pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C1, i2c::Async>>) -> ! {
     // Initialize DMP
     log::info!("Initializing DMP");
     mpu.initialize_dmp(&mut Delay).await.unwrap();
@@ -34,7 +34,7 @@ pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
     calibrate_sensor(&mut mpu).await;
 
     // Configure DMP update rate
-    mpu.set_sample_rate_divider(9).await.unwrap(); // 100Hz
+    mpu.set_sample_rate_divider(2).await.unwrap(); // 2 for good motion tracking
     log::info!("Sample rate configured");
 
 
@@ -55,11 +55,16 @@ pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
             // The quaternion represents the sensor's orientation in 3D space:
             // - w: cos(angle/2) - indicates amount of rotation
             // - i,j,k: axis * sin(angle/2) - indicates rotation axis
-            let quat = Quaternion::from_bytes(&data[..16]).unwrap().normalize();
+            let mut quat = Quaternion::from_bytes(&data[..16]).unwrap().normalize();
+
+            /*
+            In this part of the code the magnetometer data
+            should be added to z component (k) of the quaternion
+            */           
 
             // Display quaternion components
             // Values are normalized (sum of squares = 1)
-            log::info!("\nQuaternion: w={}, i={}, j={}, k={}",quat.w, quat.x, quat.y, quat.z);
+            log::info!("\nQuaternion: w={:.3}, i={:.3}, j={:.3}, k={:.3}",quat.w, quat.x, quat.y, quat.z);
         }
 
         Timer::after_millis(300).await;
