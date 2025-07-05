@@ -7,7 +7,7 @@ use embassy_executor::Spawner;
 use embassy_rp::{
     bind_interrupts,
     gpio::{Level, Output},
-    peripherals::{DMA_CH0, PIO0, I2C1, USB},
+    peripherals::{DMA_CH0, PIO0, I2C0, USB},
     pio::{self, Pio}, 
     i2c::{self, I2c},
     usb::{self, Driver},
@@ -18,7 +18,7 @@ use static_cell::StaticCell;
 
 use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
 
-use mape_2025::{
+use firmware::{
     usb_logger::logger_task,
     blinker::blink_task,
     mpu::read_mpu,
@@ -26,7 +26,7 @@ use mape_2025::{
 
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => pio::InterruptHandler<PIO0>;
-    I2C1_IRQ => i2c::InterruptHandler<I2C1>;
+    I2C0_IRQ => i2c::InterruptHandler<I2C0>;
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
 });
 
@@ -57,10 +57,10 @@ async fn main(spawner: Spawner) {
         p.DMA_CH0,
     );
     let driver = Driver::new(p.USB, Irqs);
-    let sda = p.PIN_26; // GP20, PIN26
-    let scl = p.PIN_27; // GP21, PIN27
+    let sda = p.PIN_4; // GP20, PIN26
+    let scl = p.PIN_5; // GP21, PIN27
     let config = i2c::Config::default();
-    let bus = I2c::new_async(p.I2C1, scl, sda, Irqs, config);
+    let bus = I2c::new_async(p.I2C0, scl, sda, Irqs, config);
 
     let mpu = Mpu6050::new(bus, Address::default()).await.unwrap();
 
