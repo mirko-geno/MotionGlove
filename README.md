@@ -10,9 +10,15 @@ Un guante periférico inalámbrico capaz de controlar una computadora, reemplaza
 
 
 ## Para instalar el firmware en la RP Pico W:
-Se puede hacer de dos maneras:
-1. Desde el root: cargo build --release --bin firmware --target thumbv6m-none-eabi
-2. Desde /firmware: cargo build --release
+Asegurarse que el micro esté en modo bootloader
+
+```bash
+cd firmware
+cargo run --release
+```
+
 
 ## Para ejecutar el graficador 3D:
-Desde el root: cargo build --release --bin plotter
+```bash
+cargo run --release --bin plotter
+```
