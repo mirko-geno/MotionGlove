@@ -10,13 +10,18 @@ Un guante periférico inalámbrico capaz de controlar una computadora, reemplaza
 
 
 ## Para instalar el firmware en la RP Pico W:
-Asegurarse que el micro esté en modo bootloader
+### Requerimientos para flashear el micro
+1. Se necesita elf2uf2-rs, y se puede instalar con cargo usando:
+```bash
+cargo install elf2uf2-rs
+```
+2. Asegurarse que el micro esté en modo bootloader
 
+3. Compilar y ejecutar los binarios
 ```bash
 cd firmware
 cargo run --release
 ```
-
 
 ## Para ejecutar el graficador 3D:
 ```bash
