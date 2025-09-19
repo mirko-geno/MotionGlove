@@ -7,3 +7,12 @@ Un guante periférico inalámbrico capaz de controlar una computadora, reemplaza
 - Bateria de litio
 - Sensores de fuerza
 - Teclado de membrana
+
+
+## Para instalar el firmware en la RP Pico W:
+Se puede hacer de dos maneras:
+1. Desde el root: cargo build --release --bin firmware --target thumbv6m-none-eabi
+2. Desde /firmware: cargo build --release
+
+## Para ejecutar el graficador 3D:
+Desde el root: cargo build --release --bin plotter
