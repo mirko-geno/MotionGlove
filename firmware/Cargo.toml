@@ -1,7 +1,7 @@
 [package]
 name = "firmware"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 
 [dependencies]
@@ -28,13 +28,5 @@ log = "0.4"
 
 mpu6050-dmp = { git = "https://github.com/barafael/mpu6050-dmp-rs.git", features = ["async"]}
 
-[profile.release]
-debug = 2
-lto = true
-opt-level = 'z'
 
-[profile.dev]
-debug = 2
-lto = true
-opt-level = "z"
 

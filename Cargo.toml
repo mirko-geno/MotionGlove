@@ -1,4 +1,5 @@
 [workspace]
+resolver = "3" # To use 2024 Rust version
 members = [
   "firmware",
   "programs/*"
