@@ -19,7 +19,6 @@ use static_cell::StaticCell;
 use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
 
 use firmware::{
-    usb_logger::logger_task,
     blinker::blink_task,
     mpu::read_mpu,
 };
@@ -37,11 +36,15 @@ async fn cyw43_task(runner: cyw43::Runner<'static, Output<'static>, PioSpi<'stat
 }
 
 
+#[embassy_executor::task]
+pub async fn logger_task(driver: Driver<'static, USB>) {
+    embassy_usb_logger::run!(1024, log::LevelFilter::Info, driver);
+}
+
+
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    let fw = include_bytes!("../cyw43-firmware/43439A0.bin");
-    let clm = include_bytes!("../cyw43-firmware/43439A0_clm.bin");
-
+    // Pico init and pin configuration
     let p = embassy_rp::init(Default::default());
     let pwr = Output::new(p.PIN_23, Level::Low);
     let cs = Output::new(p.PIN_25, Level::High);
@@ -56,26 +59,33 @@ async fn main(spawner: Spawner) {
         p.PIN_29,
         p.DMA_CH0,
     );
-    let driver = Driver::new(p.USB, Irqs);
-    let sda = p.PIN_4; // GP20, PIN26
-    let scl = p.PIN_5; // GP21, PIN27
-    let config = i2c::Config::default();
-    let bus = I2c::new_async(p.I2C0, scl, sda, Irqs, config);
 
-    let mpu = Mpu6050::new(bus, Address::default()).await.unwrap();
-
+    // cyw43 wifi chip init
+    let fw = include_bytes!("../cyw43-firmware/43439A0.bin");
+    let clm = include_bytes!("../cyw43-firmware/43439A0_clm.bin");
+    
     static STATE: StaticCell<cyw43::State> = StaticCell::new();
     let state = STATE.init(cyw43::State::new());
     let (_net_device, mut control, runner) = cyw43::new(state, pwr, spi, fw).await;
+    
     unwrap!(spawner.spawn(cyw43_task(runner)));
-
     control.init(clm).await;
     control
         .set_power_management(cyw43::PowerManagementMode::PowerSave) // Use cyw43::PowerManagementMode::None if too much latency
         .await;
-    
-    unwrap!(spawner.spawn(logger_task(driver)));
+
     unwrap!(spawner.spawn(blink_task(control)));
-    unwrap!(spawner.spawn(read_mpu(mpu)));
+
+    // Set usb_logger
+    let driver = Driver::new(p.USB, Irqs);
+    unwrap!(spawner.spawn(logger_task(driver)));
     
+    // Instantiate mpu sensor
+    let sda = p.PIN_4; // GP20, PIN26
+    let scl = p.PIN_5; // GP21, PIN27
+
+    let i2c_config = i2c::Config::default();
+    let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);
+    let mpu = Mpu6050::new(i2c_bus, Address::default()).await.unwrap();
+    unwrap!(spawner.spawn(read_mpu(mpu)));
 }
