@@ -4,6 +4,7 @@
 
 use core::str::from_utf8;
 
+use cyw43::JoinOptions;
 use cyw43_pio::{PioSpi, DEFAULT_CLOCK_DIVIDER};
 use defmt::*;
 use embassy_executor::Spawner;
@@ -29,6 +30,9 @@ bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
 });
+
+const WIFI_NETWORK: &str = "MirkoWifi"; // change to your network SSID
+const WIFI_PASSWORD: &str = "password123"; // change to your network password
 
 
 #[embassy_executor::task]
@@ -87,11 +91,7 @@ async fn main(spawner: Spawner) {
         .await;
 
     // Use a link-local address for communication without DHCP server
-    let config = Config::ipv4_static(embassy_net::StaticConfigV4 {
-        address: embassy_net::Ipv4Cidr::new(embassy_net::Ipv4Address::new(169, 254, 1, 1), 16),
-        dns_servers: heapless::Vec::new(),
-        gateway: None,
-    });
+    let config = Config::dhcpv4(Default::default());
 
     // Generate random seed
     let seed = rng.next_u64();
@@ -102,10 +102,22 @@ async fn main(spawner: Spawner) {
 
     unwrap!(spawner.spawn(net_task(runner)));
 
-    //control.start_ap_open("cyw43", 5).await;
-    control.start_ap_wpa2("cyw43", "password", 5).await;
+    while let Err(err) = control
+        .join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))
+        .await
+    {
+        log::info!("join failed with status={}", err.status);
+    }
+
+    log::info!("waiting for link...");
+    stack.wait_link_up().await;
+
+    log::info!("waiting for DHCP...");
+    stack.wait_config_up().await;
 
     // And now we can use it!
+    log::info!("Stack is up!");
+
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
     let mut buf = [0; 4096];
