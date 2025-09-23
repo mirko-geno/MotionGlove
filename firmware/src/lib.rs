@@ -3,3 +3,4 @@
 
 pub mod mpu;
 pub mod blinker;
+pub mod tcp_client;

@@ -19,7 +19,8 @@ use static_cell::StaticCell;
 use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
 
 use firmware::{
-    blinker::blink_task,
+    // blinker::blink_task,
+    tcp_client::{network_config, tcp_client_task},
     mpu::read_mpu,
 };
 
@@ -35,6 +36,10 @@ async fn cyw43_task(runner: cyw43::Runner<'static, Output<'static>, PioSpi<'stat
     runner.run().await
 }
 
+#[embassy_executor::task]
+async fn net_task(mut runner: embassy_net::Runner<'static, cyw43::NetDriver<'static>>) -> ! {
+    runner.run().await
+}
 
 #[embassy_executor::task]
 pub async fn logger_task(driver: Driver<'static, USB>) {
@@ -66,7 +71,7 @@ async fn main(spawner: Spawner) {
     
     static STATE: StaticCell<cyw43::State> = StaticCell::new();
     let state = STATE.init(cyw43::State::new());
-    let (_net_device, mut control, runner) = cyw43::new(state, pwr, spi, fw).await;
+    let (net_device, mut control, runner) = cyw43::new(state, pwr, spi, fw).await;
     
     unwrap!(spawner.spawn(cyw43_task(runner)));
     control.init(clm).await;
@@ -74,11 +79,15 @@ async fn main(spawner: Spawner) {
         .set_power_management(cyw43::PowerManagementMode::PowerSave) // Use cyw43::PowerManagementMode::None if too much latency
         .await;
 
-    unwrap!(spawner.spawn(blink_task(control)));
+    // unwrap!(spawner.spawn(blink_task(control)));
+
+    let (stack, runner) = network_config(net_device);
+    unwrap!(spawner.spawn(net_task(runner)));
 
     // Set usb_logger
     let driver = Driver::new(p.USB, Irqs);
     unwrap!(spawner.spawn(logger_task(driver)));
+    unwrap!(spawner.spawn(tcp_client_task(control, stack)));
     
     // Instantiate mpu sensor
     let sda = p.PIN_4; // GP20, PIN26
