@@ -11,16 +11,14 @@ use embassy_rp::{
     peripherals::{DMA_CH0, PIO0, USB},
     pio::{InterruptHandler, Pio},
     usb::{self, Driver},
-    clocks::RoscRng
-};
-use embassy_net::{
-    StackResources,
-    Config
 };
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-use dongle_firmware::tcp_server::tcp_server_task;
+use dongle_firmware::tcp_server::{
+    network_config,
+    tcp_server_task,
+};
 
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
@@ -81,16 +79,7 @@ async fn main(spawner: Spawner) {
         .set_power_management(cyw43::PowerManagementMode::PowerSave)
         .await;
 
-    // Configure the network
-    // Use a link-local address for communication without DHCP server
-    let config = Config::dhcpv4(Default::default());
-
-    // Generate random seed
-    let seed = RoscRng.next_u64();
-
-    // Init network stack
-    static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
-    let (stack, runner) = embassy_net::new(net_device, config, RESOURCES.init(StackResources::new()), seed);
+    let (stack, runner) = network_config(net_device);
     unwrap!(spawner.spawn(net_task(runner)));
 
     unwrap!(spawner.spawn(tcp_server_task(control, stack)));

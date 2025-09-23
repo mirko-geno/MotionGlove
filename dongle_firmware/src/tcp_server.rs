@@ -2,15 +2,39 @@ use {defmt_rtt as _, panic_probe as _};
 
 use core::str::from_utf8;
 use cyw43::JoinOptions;
+use embassy_rp::clocks::RoscRng;
 use embassy_net::{
+    Config,
     Stack,
     tcp::TcpSocket,
+    StackResources,
 };
 use embassy_time::Duration;
 use embedded_io_async::Write;
+use static_cell::StaticCell;
 
 const WIFI_NETWORK: &str = "MirkoWifi"; // change to your network SSID
 const WIFI_PASSWORD: &str = "password123"; // change to your network password
+
+
+pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
+    // Configure the network
+    let config = Config::ipv4_static(embassy_net::StaticConfigV4 {
+        address: embassy_net::Ipv4Cidr::new(embassy_net::Ipv4Address::new(169, 254, 1, 1), 16),
+        dns_servers: heapless::Vec::new(),
+        gateway: None,
+    });
+
+    // Generate random seed
+    let seed = RoscRng.next_u64();
+
+    // Init network stack
+    static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
+    let (stack, runner) = embassy_net::new(net_device, config, RESOURCES.init(StackResources::new()), seed);
+
+    (stack, runner)
+}
+
 
 #[embassy_executor::task]
 pub async fn tcp_server_task(mut control: cyw43::Control<'static>, stack: Stack<'static>) -> ! {
