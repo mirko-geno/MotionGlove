@@ -12,15 +12,13 @@ use embassy_net::{
 use embassy_time::{Timer, Duration};
 use embedded_io_async::Write;
 use static_cell::StaticCell;
-
-const WIFI_NETWORK: &str = "MirkoWifi"; // change to your network SSID
-const WIFI_PASSWORD: &str = "password123"; // change to your network password
+use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
     // Configure the network
     let config = Config::ipv4_static(embassy_net::StaticConfigV4 {
-        address: embassy_net::Ipv4Cidr::new(embassy_net::Ipv4Address::new(169, 254, 1, 1), 16),
+        address: embassy_net::Ipv4Cidr::new(embassy_net::Ipv4Address::from_str(SENDER_IP).unwrap(), 16),
         dns_servers: heapless::Vec::new(),
         gateway: None,
     });
@@ -41,8 +39,7 @@ pub async fn tcp_client_task(mut control: cyw43::Control<'static>, stack: Stack<
     // Try connection wifi
     while let Err(err) = control
         .join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))
-        .await
-    {
+        .await {
         log::info!("join failed with status={}", err.status);
     }
 
@@ -64,8 +61,8 @@ pub async fn tcp_client_task(mut control: cyw43::Control<'static>, stack: Stack<
 
         control.gpio_set(0, false).await; // LED off
         log::info!("Connecting...");
-        let host_addr = embassy_net::Ipv4Address::from_str("169.254.1.1").unwrap();
-        if let Err(e) = socket.connect((host_addr, 1234)).await {
+        let host_addr = embassy_net::Ipv4Address::from_str(DONGLE_IP).unwrap();
+        if let Err(e) = socket.connect((host_addr, TCP_ENDPOINT)).await {
             log::warn!("connect error: {:?}", e);
             continue;
         }

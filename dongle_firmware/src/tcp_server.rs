@@ -1,6 +1,6 @@
 use {defmt_rtt as _, panic_probe as _};
 
-use core::str::from_utf8;
+use core::str::{FromStr,from_utf8};
 use cyw43::JoinOptions;
 use embassy_rp::clocks::RoscRng;
 use embassy_net::{
@@ -12,15 +12,13 @@ use embassy_net::{
 use embassy_time::Duration;
 use embedded_io_async::Write;
 use static_cell::StaticCell;
-
-const WIFI_NETWORK: &str = "MirkoWifi"; // change to your network SSID
-const WIFI_PASSWORD: &str = "password123"; // change to your network password
+use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, DONGLE_IP};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
     // Configure the network
     let config = Config::ipv4_static(embassy_net::StaticConfigV4 {
-        address: embassy_net::Ipv4Cidr::new(embassy_net::Ipv4Address::new(169, 254, 1, 1), 16),
+        address: embassy_net::Ipv4Cidr::new(embassy_net::Ipv4Address::from_str(DONGLE_IP).unwrap(), 16),
         dns_servers: heapless::Vec::new(),
         gateway: None,
     });
@@ -38,19 +36,8 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 
 #[embassy_executor::task]
 pub async fn tcp_server_task(mut control: cyw43::Control<'static>, stack: Stack<'static>) -> ! {
-    // Try connection wifi
-    while let Err(err) = control
-        .join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))
-        .await
-    {
-        log::info!("join failed with status={}", err.status);
-    }
-
-    log::info!("waiting for link...");
-    stack.wait_link_up().await;
-
-    log::info!("waiting for DHCP...");
-    stack.wait_config_up().await;
+    //control.start_ap_open("cyw43", 5).await;
+    control.start_ap_wpa2(WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL).await;
 
     // And now we can use it!
     log::info!("Stack is up!");
@@ -64,8 +51,8 @@ pub async fn tcp_server_task(mut control: cyw43::Control<'static>, stack: Stack<
         socket.set_timeout(Some(Duration::from_secs(10)));
 
         control.gpio_set(0, false).await;
-        log::info!("Listening on TCP:1234...");
-        if let Err(e) = socket.accept(1234).await {
+        log::info!("Listening on TCP: {TCP_ENDPOINT}...");
+        if let Err(e) = socket.accept(TCP_ENDPOINT).await {
             log::warn!("accept error: {:?}", e);
             continue;
         }
