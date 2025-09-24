@@ -9,7 +9,7 @@ use embassy_net::{
     tcp::TcpSocket,
     StackResources,
 };
-use embassy_time::{Timer, Duration};
+use embassy_time::{Timer, Duration, with_timeout};
 use embedded_io_async::Write;
 use static_cell::StaticCell;
 use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT};
@@ -36,47 +36,69 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 
 #[embassy_executor::task]
 pub async fn tcp_client_task(mut control: cyw43::Control<'static>, stack: Stack<'static>) -> ! {
-    // Try connection wifi
-    while let Err(err) = control
-        .join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))
-        .await {
-        log::info!("join failed with status={}", err.status);
-    }
-
-    log::info!("waiting for link...");
-    stack.wait_link_up().await;
-
-    log::info!("waiting for DHCP...");
-    stack.wait_config_up().await;
-
-    // And now we can use it!
-    log::info!("Stack is up!");
-
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
 
+    // Try wifi connection
     loop {
-        let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-        socket.set_timeout(Some(Duration::from_secs(10)));
+        log::info!("Connecting to WiFi...");
+        let _ = control.leave().await; // Drops any wifi association to avoid control.join(...) crashes
+        // with_timeout to retry avoiding softlocks
+        match with_timeout(Duration::from_secs(5), 
+        control.join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))).await {
+            Err(_err) => {
+                log::info!("Wifi connection failed, connection timed out");
+                Timer::after_millis(250).await;
+                continue;
+            },
 
-        control.gpio_set(0, false).await; // LED off
-        log::info!("Connecting...");
-        let host_addr = embassy_net::Ipv4Address::from_str(DONGLE_IP).unwrap();
-        if let Err(e) = socket.connect((host_addr, TCP_ENDPOINT)).await {
-            log::warn!("connect error: {:?}", e);
-            continue;
+            Ok(res) => {
+                if let Err(err) = res {
+                    log::info!("Wifi connection failed with status={}", err.status);
+                    Timer::after_millis(250).await;
+                    continue;
+                }
+            }
         }
-        log::info!("Connected to {:?}", socket.remote_endpoint());
-        control.gpio_set(0, true).await; // LED on
 
-        let msg = b"Hello world!\n";
+        log::info!("Waiting for link...");
+        stack.wait_link_up().await;
+
+        log::info!("Waiting for DHCP...");
+        stack.wait_config_up().await;
+
+        // And now we can use it!
+        log::info!("Stack is up!");
+
+        // Clean buffers
+        rx_buffer.fill(0);
+        tx_buffer.fill(0);
+
         loop {
-            if let Err(e) = socket.write_all(msg).await {
-                log::warn!("write error: {:?}", e);
+            let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
+            socket.set_timeout(Some(Duration::from_secs(10)));
+
+            control.gpio_set(0, false).await; // LED off
+            log::info!("Connecting to TCP...");
+            let host_addr = embassy_net::Ipv4Address::from_str(DONGLE_IP).unwrap();
+            if let Err(e) = socket.connect((host_addr, TCP_ENDPOINT)).await {
+                log::warn!("TCP connection error: {:?}", e);
                 break;
             }
-            log::info!("txd: {}", core::str::from_utf8(msg).unwrap());
-            Timer::after_secs(1).await;
+
+            log::info!("Connected to {:?}", socket.remote_endpoint());
+            control.gpio_set(0, true).await; // LED on
+
+            let msg = b"Hello world!\n";
+
+            loop {
+                if let Err(e) = socket.write_all(msg).await {
+                    log::warn!("Write error: {:?}", e);
+                    break;
+                }
+                log::info!("txd: {}", core::str::from_utf8(msg).unwrap());
+                Timer::after_secs(1).await;
+            }
         }
     }
 }
