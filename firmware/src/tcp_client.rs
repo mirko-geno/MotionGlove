@@ -9,10 +9,14 @@ use embassy_net::{
     tcp::TcpSocket,
     StackResources,
 };
+use embassy_sync::{
+    channel::Receiver,
+    blocking_mutex::raw::CriticalSectionRawMutex,
+};
 use embassy_time::{Timer, Duration, with_timeout};
 use embedded_io_async::Write;
 use static_cell::StaticCell;
-use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT};
+use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT, Message};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
@@ -35,14 +39,14 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 
 
 #[embassy_executor::task]
-pub async fn tcp_client_task(mut control: cyw43::Control<'static>, stack: Stack<'static>) -> ! {
+pub async fn tcp_client_task(mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'static, CriticalSectionRawMutex, Message, 32>) -> ! {
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
 
     // Try wifi connection
     loop {
         log::info!("Connecting to WiFi...");
-        let _ = control.leave().await; // Drops any wifi association to avoid control.join(...) crashes
+        control.leave().await; // Drops any wifi association to avoid control.join(...) crashes
         // with_timeout to retry avoiding softlocks
         match with_timeout(Duration::from_secs(5), 
         control.join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))).await {
@@ -92,11 +96,12 @@ pub async fn tcp_client_task(mut control: cyw43::Control<'static>, stack: Stack<
             let msg = b"Hello world!\n";
 
             loop {
-                if let Err(e) = socket.write_all(msg).await {
+                let message = rx_ch.receive().await;
+                if let Err(e) = socket.write_all(message.to_string()).await {
                     log::warn!("Write error: {:?}", e);
                     break;
                 }
-                log::info!("txd: {}", core::str::from_utf8(msg).unwrap());
+                log::info!("txd: {}", core::str::from_utf8(message.to_string()).unwrap());
                 Timer::after_secs(1).await;
             }
         }

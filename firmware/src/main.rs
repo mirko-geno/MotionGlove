@@ -1,7 +1,10 @@
 #![no_std]
 #![no_main]
 
+use core::time::Duration;
+
 use defmt::*;
+use embassy_time::{Duration, Timer};
 use {defmt_rtt as _, panic_probe as _};
 use embassy_executor::Spawner;
 use embassy_rp::{
@@ -11,6 +14,10 @@ use embassy_rp::{
     pio::{self, Pio}, 
     i2c::{self, I2c},
     usb::{self, Driver},
+};
+use embassy_sync::{
+    channel::Channel,
+    blocking_mutex::raw::CriticalSectionRawMutex,
 };
 use cyw43_pio::{PioSpi, DEFAULT_CLOCK_DIVIDER};
 
@@ -22,6 +29,7 @@ use firmware::{
     // blinker::blink_task,
     tcp_client::{network_config, tcp_client_task},
     mpu::read_mpu,
+    Message
 };
 
 bind_interrupts!(struct Irqs {
@@ -65,6 +73,10 @@ async fn main(spawner: Spawner) {
         p.DMA_CH0,
     );
 
+    // Set usb_logger
+    let driver = Driver::new(p.USB, Irqs);
+    unwrap!(spawner.spawn(logger_task(driver)));
+    
     // cyw43 wifi chip init
     let fw = include_bytes!("../cyw43-firmware/43439A0.bin");
     let clm = include_bytes!("../cyw43-firmware/43439A0_clm.bin");
@@ -84,10 +96,11 @@ async fn main(spawner: Spawner) {
     let (stack, runner) = network_config(net_device);
     unwrap!(spawner.spawn(net_task(runner)));
 
-    // Set usb_logger
-    let driver = Driver::new(p.USB, Irqs);
-    unwrap!(spawner.spawn(logger_task(driver)));
-    unwrap!(spawner.spawn(tcp_client_task(control, stack)));
+    static CHANNEL: Channel<CriticalSectionRawMutex, Message, 32> = Channel::new();
+    let tx_ch = CHANNEL.sender();
+    let rx_ch = CHANNEL.receiver();
+
+    unwrap!(spawner.spawn(tcp_client_task(control, stack, rx_ch)));
     
     // Instantiate mpu sensor
     let sda = p.PIN_4; // GP20, PIN26
@@ -97,4 +110,10 @@ async fn main(spawner: Spawner) {
     let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);
     let mpu = Mpu6050::new(i2c_bus, Address::default()).await.unwrap();
     unwrap!(spawner.spawn(read_mpu(mpu)));
+
+    let message = Message(10);
+    loop {
+        tx_ch.send(message);
+        Timer::after(Duration::from_millis(250));
+    }
 }
