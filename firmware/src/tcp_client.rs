@@ -42,6 +42,7 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 pub async fn tcp_client_task(mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'static, CriticalSectionRawMutex, Message, 32>) -> ! {
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
+    let mut message: Message;
 
     // Try wifi connection
     loop {
@@ -93,15 +94,13 @@ pub async fn tcp_client_task(mut control: cyw43::Control<'static>, stack: Stack<
             log::info!("Connected to {:?}", socket.remote_endpoint());
             control.gpio_set(0, true).await; // LED on
 
-            let msg = b"Hello world!\n";
-
             loop {
-                let message = rx_ch.receive().await;
-                if let Err(e) = socket.write_all(message.to_string()).await {
+                message = rx_ch.receive().await;
+                if let Err(e) = socket.write_all(message.to_send()).await {
                     log::warn!("Write error: {:?}", e);
                     break;
                 }
-                log::info!("txd: {}", core::str::from_utf8(message.to_string()).unwrap());
+                // log::info!("txd: {:?}", (&message.to_send()[..]));
                 Timer::after_secs(1).await;
             }
         }

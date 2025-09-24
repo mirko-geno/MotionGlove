@@ -1,7 +1,6 @@
 use {defmt_rtt as _, panic_probe as _};
 
 use core::str::{FromStr,from_utf8};
-use cyw43::JoinOptions;
 use embassy_rp::clocks::RoscRng;
 use embassy_net::{
     Config,

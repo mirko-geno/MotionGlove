@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use core::time::Duration;
-
 use defmt::*;
 use embassy_time::{Duration, Timer};
 use {defmt_rtt as _, panic_probe as _};
@@ -110,10 +108,12 @@ async fn main(spawner: Spawner) {
     let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);
     let mpu = Mpu6050::new(i2c_bus, Address::default()).await.unwrap();
     unwrap!(spawner.spawn(read_mpu(mpu)));
-
-    let message = Message(10);
+    
+    let mut message = Message::new(b"hola");
+    
     loop {
-        tx_ch.send(message);
-        Timer::after(Duration::from_millis(250));
+        tx_ch.send(message).await;
+        Timer::after(Duration::from_millis(250)).await;
+        message = Message::new(b"hola");
     }
 }
