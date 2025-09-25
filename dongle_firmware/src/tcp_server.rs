@@ -72,7 +72,7 @@ pub async fn tcp_server_task(mut control: cyw43::Control<'static>, stack: Stack<
                 }
             };
 
-            log::info!("Received: {}", from_utf8(&buf[..n]).unwrap());
+            log::info!("{}", from_utf8(&buf[..n]).unwrap());
 
             match socket.write_all(b"Ok").await {
                 Ok(()) => {}
