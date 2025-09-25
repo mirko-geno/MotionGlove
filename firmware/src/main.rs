@@ -86,7 +86,7 @@ async fn main(spawner: Spawner) {
     unwrap!(spawner.spawn(cyw43_task(runner)));
     control.init(clm).await;
     control
-        .set_power_management(cyw43::PowerManagementMode::PowerSave) // Use cyw43::PowerManagementMode::None if too much latency
+        .set_power_management(cyw43::PowerManagementMode::None) // Use cyw43::PowerManagementMode::None if too much latency
         .await;
 
     // unwrap!(spawner.spawn(blink_task(control)));
