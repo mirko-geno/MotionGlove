@@ -45,7 +45,7 @@ mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'st
 ) -> ! {
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
-    let mut message: String<MESSAGE_LENGTH> = String::new();
+    let mut message: String<MESSAGE_LENGTH>;
 
     // Try wifi connection
     loop {

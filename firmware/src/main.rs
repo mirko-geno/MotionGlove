@@ -2,7 +2,6 @@
 #![no_main]
 
 use defmt::*;
-use embassy_time::{Duration, Timer};
 use {defmt_rtt as _, panic_probe as _};
 use embassy_executor::Spawner;
 use embassy_rp::{

@@ -62,7 +62,7 @@ pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>, tx_ch: S
             // The quaternion represents the sensor's orientation in 3D space:
             // - w: cos(angle/2) - indicates amount of rotation
             // - i,j,k: axis * sin(angle/2) - indicates rotation axis
-            let mut quat = Quaternion::from_bytes(&data[..16]).unwrap().normalize();
+            let quat = Quaternion::from_bytes(&data[..16]).unwrap().normalize();
 
             /*
             In this part of the code the magnetometer data
