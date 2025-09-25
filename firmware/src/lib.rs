@@ -11,18 +11,5 @@ pub const TCP_CHANNEL: u8 = 5;
 pub const TCP_ENDPOINT: u16 = 50124;
 pub const DONGLE_IP: &str = "169.254.1.1";
 pub const SENDER_IP: &str = "169.254.1.2";
-
-
-pub struct Message {
-    content: &'static [u8]
-}
-
-impl Message {
-    pub fn new(content: &'static [u8]) -> Self {
-        Self { content: content }
-    }
-
-    pub fn to_send(&mut self) -> &'static [u8] {
-        self.content
-    }
-}
+pub const MESSAGE_LENGTH: usize = 64;
+pub const CHANNEL_SIZE: usize = 2;

@@ -4,11 +4,18 @@ use embassy_rp::{
     peripherals::I2C0, 
     i2c::{self, I2c},
 };
+use embassy_sync::{
+    channel::Sender,
+    blocking_mutex::raw::CriticalSectionRawMutex,
+};
 use mpu6050_dmp::{
     sensor_async::Mpu6050,
     calibration::CalibrationParameters,
     quaternion::Quaternion,
 };
+use heapless::String;
+use core::fmt::Write;
+use crate::{MESSAGE_LENGTH, CHANNEL_SIZE};
 
 
 async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
@@ -25,7 +32,7 @@ async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
 
 
 #[embassy_executor::task]
-pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
+pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>, tx_ch: Sender<'static, CriticalSectionRawMutex, String<MESSAGE_LENGTH>, CHANNEL_SIZE>) -> ! {
     // Initialize DMP
     log::info!("Initializing DMP");
     mpu.initialize_dmp(&mut Delay).await.unwrap();
@@ -64,9 +71,11 @@ pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> ! {
 
             // Display quaternion components
             // Values are normalized (sum of squares = 1)
-            log::info!("\nQuaternion: w={:.3}, i={:.3}, j={:.3}, k={:.3}",quat.w, quat.x, quat.y, quat.z);
+            let mut message: String<MESSAGE_LENGTH> = String::new();
+            write!(&mut message, "\nQuaternion: w={:.3}, i={:.3}, j={:.3}, k={:.3}", quat.w, quat.x, quat.y, quat.z).unwrap();
+            tx_ch.send(message).await;
+            log::info!("Quaternion: w={:.3}, i={:.3}, j={:.3}, k={:.3}\n",quat.w, quat.x, quat.y, quat.z);
         }
-
         Timer::after_millis(10).await;
     }
 }

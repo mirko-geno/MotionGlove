@@ -72,15 +72,16 @@ pub async fn tcp_server_task(mut control: cyw43::Control<'static>, stack: Stack<
                 }
             };
 
-            log::info!("rxd {}", from_utf8(&buf[..n]).unwrap());
+            log::info!("Received: {}", from_utf8(&buf[..n]).unwrap());
 
-            match socket.write_all(&buf[..n]).await {
+            match socket.write_all(b"Ok").await {
                 Ok(()) => {}
                 Err(e) => {
                     log::warn!("write error: {:?}", e);
                     break;
                 }
             };
+            
         }
     }
 }

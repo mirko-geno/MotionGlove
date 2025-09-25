@@ -19,6 +19,7 @@ use embassy_sync::{
 };
 use cyw43_pio::{PioSpi, DEFAULT_CLOCK_DIVIDER};
 
+use heapless::String;
 use static_cell::StaticCell;
 
 use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
@@ -27,7 +28,7 @@ use firmware::{
     // blinker::blink_task,
     tcp_client::{network_config, tcp_client_task},
     mpu::read_mpu,
-    Message
+    MESSAGE_LENGTH, CHANNEL_SIZE,
 };
 
 bind_interrupts!(struct Irqs {
@@ -94,7 +95,7 @@ async fn main(spawner: Spawner) {
     let (stack, runner) = network_config(net_device);
     unwrap!(spawner.spawn(net_task(runner)));
 
-    static CHANNEL: Channel<CriticalSectionRawMutex, Message, 32> = Channel::new();
+    static CHANNEL: Channel<CriticalSectionRawMutex, String<MESSAGE_LENGTH>, CHANNEL_SIZE> = Channel::new();
     let tx_ch = CHANNEL.sender();
     let rx_ch = CHANNEL.receiver();
 
@@ -107,13 +108,5 @@ async fn main(spawner: Spawner) {
     let i2c_config = i2c::Config::default();
     let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);
     let mpu = Mpu6050::new(i2c_bus, Address::default()).await.unwrap();
-    unwrap!(spawner.spawn(read_mpu(mpu)));
-    
-    let mut message = Message::new(b"hola");
-    
-    loop {
-        tx_ch.send(message).await;
-        Timer::after(Duration::from_millis(250)).await;
-        message = Message::new(b"hola");
-    }
+    unwrap!(spawner.spawn(read_mpu(mpu, tx_ch)));
 }
