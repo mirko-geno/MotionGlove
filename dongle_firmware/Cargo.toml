@@ -11,6 +11,7 @@ embassy-time        = { version = "0.5.0", features = ["defmt", "defmt-timestamp
 embassy-rp          = { version = "0.8.0", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp2040"] }
 embassy-usb-logger  = { version = "0.5.1" }
 embassy-net         = { version = "0.7.1", features = ["defmt", "icmp", "tcp", "udp", "raw", "dhcpv4", "medium-ethernet", "dns", "proto-ipv4", "proto-ipv6", "multicast"] }
+embassy-sync        = { version = "0.7.2", features = ["defmt"] }
 
 cyw43               = { version = "0.5.0", features = ["defmt", "firmware-logs"] }
 cyw43-pio           = { version = "0.8.0", features = ["defmt"] }

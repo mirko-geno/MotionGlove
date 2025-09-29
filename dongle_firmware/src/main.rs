@@ -12,6 +12,12 @@ use embassy_rp::{
     pio::{InterruptHandler, Pio},
     usb::{self, Driver},
 };
+use embassy_sync::{
+    channel::Channel,
+    blocking_mutex::raw::CriticalSectionRawMutex,
+};
+
+use heapless::String;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -19,6 +25,9 @@ use dongle_firmware::tcp_server::{
     network_config,
     tcp_server_task,
 };
+
+use firmware::{MESSAGE_LENGTH, CHANNEL_SIZE};
+
 
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
@@ -82,5 +91,9 @@ async fn main(spawner: Spawner) {
     let (stack, runner) = network_config(net_device);
     unwrap!(spawner.spawn(net_task(runner)));
 
-    unwrap!(spawner.spawn(tcp_server_task(control, stack)));
+    static CHANNEL: Channel<CriticalSectionRawMutex, String<MESSAGE_LENGTH>, CHANNEL_SIZE> = Channel::new();
+    let tx_ch = CHANNEL.sender();
+    let rx_ch = CHANNEL.receiver();
+
+    unwrap!(spawner.spawn(tcp_server_task(control, stack, tx_ch)));
 }

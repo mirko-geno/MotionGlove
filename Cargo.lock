@@ -629,6 +629,7 @@ dependencies = [
  "embassy-executor",
  "embassy-net",
  "embassy-rp",
+ "embassy-sync",
  "embassy-time",
  "embassy-usb-logger",
  "embedded-io-async",
