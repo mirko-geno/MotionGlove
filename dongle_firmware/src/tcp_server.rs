@@ -81,13 +81,8 @@ pub async fn tcp_server_task(
                     tx_ch.send(String::from_utf8(message).unwrap()).await;
                 },
             };
-
-<<<<<<< Updated upstream
-            log::info!("{}", from_utf8(&buf[..n]).unwrap());
-=======
             // log::info!("Received: {}", from_utf8(&buf[..n]).unwrap());
->>>>>>> Stashed changes
-
+            
             match socket.write_all(b"Ok").await {
                 Err(e) => {
                     log::warn!("write error: {:?}", e);
