@@ -97,12 +97,21 @@ mut hid_keyboard: HidReaderWriter<'static, embassy_rp::usb::Driver<'static, USB>
             leds: 0,
             keycodes: [4, 0, 0, 0, 0, 0], // 'a'
         };
+        let release_keyboard_report = KeyboardReport {
+            modifier: 0,
+            reserved: 0,
+            leds: 0,
+            keycodes: [0, 0, 0, 0, 0, 0], // None
+        };
 
         if let Err(e) = hid_mouse.write_serialize(&mouse_report).await {
             log::warn!("Failed to send mouse report: {:?}", e);
         }
         if let Err(e) = hid_keyboard.write_serialize(&keyboard_report).await {
             log::warn!("Failed to send keyboard report: {:?}", e);
+        }
+        if let Err(e) = hid_keyboard.write_serialize(&release_keyboard_report).await {
+            log::warn!("Failed to release keyboard report: {:?}", e);
         }
         Timer::after_secs(1).await
     }
