@@ -23,7 +23,7 @@ use {defmt_rtt as _, panic_probe as _};
 
 use dongle_firmware::{
     tcp_server::{network_config, tcp_server_task,},
-    hid::{config_usb, hid_usb}
+    hid::{config_usb, hid_usb_controller}
 };
 
 use firmware::{MESSAGE_LENGTH, CHANNEL_SIZE};
@@ -65,9 +65,9 @@ async fn main(spawner: Spawner) {
     // Config USB port
     let driver = Driver::new(p.USB, Irqs);
     // unwrap!(spawner.spawn(logger_task(driver)));
-    let (usb, hid_mouse, hid_keyboard) = config_usb(driver);
+    let (usb, hid_mouse, hid_keyboard, hid_media) = config_usb(driver);
     unwrap!(spawner.spawn(usb_task(usb)));
-    unwrap!(spawner.spawn(hid_usb(hid_mouse, hid_keyboard)));
+    unwrap!(spawner.spawn(hid_usb_controller(hid_mouse, hid_keyboard, hid_media)));
 
     // cyw43 wifi chip init
     let fw = include_bytes!("../../firmware/cyw43-firmware/43439A0.bin");
