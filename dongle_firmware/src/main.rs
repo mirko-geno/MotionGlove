@@ -21,9 +21,9 @@ use heapless::String;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-use dongle_firmware::tcp_server::{
-    network_config,
-    tcp_server_task,
+use dongle_firmware::{
+    tcp_server::{network_config, tcp_server_task,},
+    hid::hid_usb
 };
 
 use firmware::{MESSAGE_LENGTH, CHANNEL_SIZE};
@@ -45,20 +45,22 @@ async fn net_task(mut runner: embassy_net::Runner<'static, cyw43::NetDriver<'sta
     runner.run().await
 }
 
+/*
 #[embassy_executor::task]
 pub async fn logger_task(driver: Driver<'static, USB>) {
     embassy_usb_logger::run!(1024, log::LevelFilter::Info, driver);
 }
-
+*/
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     // Pico init
     let p = embassy_rp::init(Default::default());
 
-    // Set usb_logger
+    // Config USB port
     let driver = Driver::new(p.USB, Irqs);
-    unwrap!(spawner.spawn(logger_task(driver)));
+    // unwrap!(spawner.spawn(logger_task(driver)));
+    unwrap!(spawner.spawn(hid_usb(driver)));
 
     // cyw43 wifi chip init
     let fw = include_bytes!("../../firmware/cyw43-firmware/43439A0.bin");
