@@ -11,8 +11,20 @@ use embassy_usb::{
 };
 use embassy_futures::join::join;
 use embassy_time::Timer;
-use usbd_hid::descriptor::{MouseReport, SerializedDescriptor};
+use usbd_hid::descriptor::{MouseReport, KeyboardReport, SerializedDescriptor};
+use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
+
+
+// USB Descriptors
+static CONFIG_DESCRIPTOR: StaticCell<[u8; 256]> = StaticCell::new();
+static BOS_DESCRIPTOR: StaticCell<[u8; 256]> = StaticCell::new();
+static MSOS_DESCRIPTOR: StaticCell<[u8; 256]> = StaticCell::new();
+static CONTROL_BUF: StaticCell<[u8; 64]> = StaticCell::new();
+
+// USB Handlers
+static DEVICE_HANDLER: StaticCell<MyDeviceHandler> = StaticCell::new();
+
 
 struct MyRequestHandler {}
 
@@ -79,6 +91,7 @@ impl Handler for MyDeviceHandler {
     }
 }
 
+
 #[embassy_executor::task]
 pub async fn hid_usb(driver: Driver<'static, USB>) -> () {
     // Create embassy-usb Config
@@ -89,74 +102,87 @@ pub async fn hid_usb(driver: Driver<'static, USB>) -> () {
     config.max_power = 100;
     config.max_packet_size_0 = 64;
 
-    // Create embassy-usb DeviceBuilder using the driver and config.
-    // It needs some buffers for building the descriptors.
-    let mut config_descriptor = [0; 256];
-    let mut bos_descriptor = [0; 256];
-    // You can also add a Microsoft OS descriptor.
-    let mut msos_descriptor = [0; 256];
-    let mut control_buf = [0; 64];
-    let mut request_handler = MyRequestHandler {};
-    let mut device_handler = MyDeviceHandler::new();
+    // Init static memory
+    let config_descriptor = CONFIG_DESCRIPTOR.init([0; 256]);
+    let bos_descriptor = BOS_DESCRIPTOR.init([0; 256]);
+    let msos_descriptor = MSOS_DESCRIPTOR.init([0; 256]);
+    let control_buf = CONTROL_BUF.init([0; 64]);
+    let device_handler = DEVICE_HANDLER.init(MyDeviceHandler::new());
 
-    let mut state = hid::State::new();
-
+    // USB Builder
     let mut builder = embassy_usb::Builder::new(
         driver,
         config,
-        &mut config_descriptor,
-        &mut bos_descriptor,
-        &mut msos_descriptor,
-        &mut control_buf,
+        config_descriptor,
+        bos_descriptor,
+        msos_descriptor,
+        control_buf,
     );
+    builder.handler(device_handler);
 
-    builder.handler(&mut device_handler);
-
-    // Create classes on the builder.
-    let config = embassy_usb::class::hid::Config {
+    // Mouse config
+    static MOUSE_STATE: StaticCell<hid::State> = StaticCell::new();
+    let mouse_state = MOUSE_STATE.init(hid::State::new());
+    let mouse_config = embassy_usb::class::hid::Config {
         report_descriptor: MouseReport::desc(),
         request_handler: None,
         poll_ms: 60,
         max_packet_size: 64,
     };
-    let hid = HidReaderWriter::<_, 1, 8>::new(&mut builder, &mut state, config);
+    let mouse_hid = HidReaderWriter::<_, 1, 8>::new(&mut builder, mouse_state, mouse_config);
 
-    // Build the builder.
+    // Keyboard config
+    static KEYBOARD_STATE: StaticCell<hid::State> = StaticCell::new();
+    let keyboard_state = KEYBOARD_STATE.init(hid::State::new());
+    let keyboard_config = embassy_usb::class::hid::Config {
+        report_descriptor: KeyboardReport::desc(),
+        request_handler: None,
+        poll_ms: 10,
+        max_packet_size: 64,
+    };
+    let keyboard_hid = HidReaderWriter::<_, 1, 8>::new(&mut builder, keyboard_state, keyboard_config);
+
+    // USB Build
     let mut usb = builder.build();
-
-    // Run the USB device.
     let usb_fut = usb.run();
 
-    let (reader, mut writer) = hid.split();
 
-    // Do stuff with the class!
-    let in_fut = async {
-        // let mut rng = RoscRng;
+    let (_mouse_reader, mut mouse_writer) = mouse_hid.split();
+    let (_kbd_reader, mut kbd_writer) = keyboard_hid.split();
 
+    // Mouse reports
+    let mouse_fut = async {
         loop {
-            // every 1 second
             _ = Timer::after_secs(1).await;
             let report = MouseReport {
                 buttons: 0,
-                x: 2, // rng.random_range(-100..100), // random small x movement
-                y: 5, // rng.random_range(-100..100), // random small y movement
+                x: 5,
+                y: 3,
                 wheel: 0,
                 pan: 0,
             };
-            // Send the report.
-            match writer.write_serialize(&report).await {
-                Err(e) => warn!("Failed to send report: {:?}", e),
-                Ok(()) => {}
-                
+            if let Err(e) = mouse_writer.write_serialize(&report).await {
+                warn!("Failed to send mouse report: {:?}", e);
             }
         }
     };
 
-    let out_fut = async {
-        reader.run(false, &mut request_handler).await;
+    // Keyboard reports
+    let keyboard_fut = async {
+        loop {
+            _ = Timer::after_secs(2).await;
+            let report = KeyboardReport {
+                modifier: 0,
+                reserved: 0,
+                leds: 0,
+                keycodes: [4, 0, 0, 0, 0, 0], // tecla 'a'
+            };
+            if let Err(e) = kbd_writer.write_serialize(&report).await {
+                warn!("Failed to send keyboard report: {:?}", e);
+            }
+        }
     };
 
-    // Run everything concurrently.
-    // If we had made everything `'static` above instead, we could do this using separate tasks instead.
-    join(usb_fut, join(in_fut, out_fut)).await;
+    // Execute everything concurrently
+    join(usb_fut, join(mouse_fut, keyboard_fut)).await;
 }
