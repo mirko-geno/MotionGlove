@@ -23,7 +23,7 @@ use {defmt_rtt as _, panic_probe as _};
 
 use dongle_firmware::{
     tcp_server::{network_config, tcp_server_task,},
-    hid::hid_usb
+    hid::{config_usb, hid_usb}
 };
 
 use firmware::{MESSAGE_LENGTH, CHANNEL_SIZE};
@@ -52,6 +52,11 @@ pub async fn logger_task(driver: Driver<'static, USB>) {
 }
 */
 
+#[embassy_executor::task]
+pub async fn usb_task(mut usb: embassy_usb::UsbDevice<'static, Driver<'static, USB>>) -> ! {
+    usb.run().await
+}
+
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     // Pico init
@@ -60,7 +65,9 @@ async fn main(spawner: Spawner) {
     // Config USB port
     let driver = Driver::new(p.USB, Irqs);
     // unwrap!(spawner.spawn(logger_task(driver)));
-    unwrap!(spawner.spawn(hid_usb(driver)));
+    let (usb, hid_mouse, hid_keyboard) = config_usb(driver);
+    unwrap!(spawner.spawn(usb_task(usb)));
+    unwrap!(spawner.spawn(hid_usb(hid_mouse, hid_keyboard)));
 
     // cyw43 wifi chip init
     let fw = include_bytes!("../../firmware/cyw43-firmware/43439A0.bin");
