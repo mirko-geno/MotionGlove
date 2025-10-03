@@ -108,10 +108,10 @@ pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidD
             keycodes: [0, 0, 0, 0, 0, 0], // None
         };
         let media_report = MediaKeyboardReport {
-            usage_id: MediaKey::Pause as u16
+            usage_id: MediaKey::PlayPause.into() // Pause / Play button
         };
         let release_media_report = MediaKeyboardReport {
-            usage_id: 0
+            usage_id: MediaKey::Zero.into()
         };
         if let Err(e) = hid_mouse.write_serialize(&mouse_report).await {
             log::warn!("Failed to send mouse report: {:?}", e);
