@@ -16,7 +16,7 @@ use embassy_sync::{
 use embedded_io_async::Write;
 use heapless::{String, Vec};
 use static_cell::StaticCell;
-use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, DONGLE_IP, MESSAGE_LENGTH, CHANNEL_SIZE};
+use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, DONGLE_IP, MessageArr, CHANNEL_SIZE};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
@@ -40,7 +40,7 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 
 #[embassy_executor::task]
 pub async fn tcp_server_task(
-    mut control: cyw43::Control<'static>, stack: Stack<'static>, tx_ch: Sender<'static, CriticalSectionRawMutex, String<MESSAGE_LENGTH>, CHANNEL_SIZE>
+    mut control: cyw43::Control<'static>, stack: Stack<'static>, tx_ch: Sender<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>
 ) -> ! {
     //control.start_ap_open("cyw43", 5).await;
     control.start_ap_wpa2(WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL).await;
@@ -77,8 +77,8 @@ pub async fn tcp_server_task(
                     break;
                 }
                 Ok(idx) => {
-                    let message = Vec::from_slice(&buf[..idx]).unwrap();
-                    tx_ch.send(String::from_utf8(message).unwrap()).await;
+                    let message: [u8;12] = &buf[..idx];
+                    tx_ch.send(message).await;
                 },
             };
             // log::info!("Received: {}", from_utf8(&buf[..n]).unwrap());

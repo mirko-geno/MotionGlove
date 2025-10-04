@@ -26,7 +26,7 @@ use dongle_firmware::{
     hid::{config_usb, hid_usb_controller}
 };
 
-use firmware::{MESSAGE_LENGTH, CHANNEL_SIZE};
+use firmware::{SensorReadings, MessageArr, CHANNEL_SIZE};
 
 
 bind_interrupts!(struct Irqs {
@@ -100,7 +100,7 @@ async fn main(spawner: Spawner) {
     let (stack, runner) = network_config(net_device);
     unwrap!(spawner.spawn(net_task(runner)));
 
-    static CHANNEL: Channel<CriticalSectionRawMutex, String<MESSAGE_LENGTH>, CHANNEL_SIZE> = Channel::new();
+    static CHANNEL: Channel<CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE> = Channel::new();
     let tx_ch = CHANNEL.sender();
     let rx_ch = CHANNEL.receiver();
 

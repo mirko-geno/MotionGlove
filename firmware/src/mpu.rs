@@ -1,5 +1,5 @@
 use {defmt_rtt as _, panic_probe as _};
-use embassy_time::{Timer, Delay};
+use embassy_time::{Delay, Duration, Timer};
 use embassy_rp::{
     peripherals::I2C0, 
     i2c::{self, I2c},
@@ -12,9 +12,7 @@ use mpu6050_dmp::{
     sensor_async::Mpu6050,
     calibration::CalibrationParameters,
 };
-use heapless::String;
-use core::fmt::Write;
-use crate::{MESSAGE_LENGTH, CHANNEL_SIZE};
+use crate::{SensorReadings, CHANNEL_SIZE, READ_FREQ, MessageArr};
 
 
 async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
@@ -31,7 +29,7 @@ async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
 
 
 #[embassy_executor::task]
-pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>, tx_ch: Sender<'static, CriticalSectionRawMutex, String<MESSAGE_LENGTH>, CHANNEL_SIZE>) -> ! {
+pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>, tx_ch: Sender<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>) -> ! {
     /*
     let mut count = 0;
     loop {
@@ -69,12 +67,9 @@ pub async fn read_mpu(mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>, tx_ch: S
             gyro.y(),
             gyro.z()
         );
-        let mut message: String<MESSAGE_LENGTH> = String::new();
-        write!(&mut message,
-            "\nAcc: x={}, y={}, z={}", accel.x(), accel.y(), accel.z()
-        ).unwrap();
-        tx_ch.send(message).await;
-        Timer::after_millis(100).await;
+        let readings = SensorReadings::from(accel, gyro);
+        tx_ch.send(readings.as_bytes()).await;
+        Timer::after(Duration::from_hz(READ_FREQ)).await;
     }
 }
 

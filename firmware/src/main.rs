@@ -18,7 +18,6 @@ use embassy_sync::{
 };
 use cyw43_pio::{PioSpi, DEFAULT_CLOCK_DIVIDER};
 
-use heapless::String;
 use static_cell::StaticCell;
 
 use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
@@ -27,7 +26,7 @@ use firmware::{
     // blinker::blink_task,
     tcp_client::{network_config, tcp_client_task},
     mpu::read_mpu,
-    MESSAGE_LENGTH, CHANNEL_SIZE,
+    MessageArr, CHANNEL_SIZE,
 };
 
 bind_interrupts!(struct Irqs {
@@ -94,7 +93,7 @@ async fn main(spawner: Spawner) {
     let (stack, runner) = network_config(net_device);
     unwrap!(spawner.spawn(net_task(runner)));
 
-    static CHANNEL: Channel<CriticalSectionRawMutex, String<MESSAGE_LENGTH>, CHANNEL_SIZE> = Channel::new();
+    static CHANNEL: Channel<CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE> = Channel::new();
     let tx_ch = CHANNEL.sender();
     let rx_ch = CHANNEL.receiver();
 
