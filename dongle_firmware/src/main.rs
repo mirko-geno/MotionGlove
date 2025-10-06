@@ -17,7 +17,6 @@ use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
 
-use heapless::String;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -34,6 +33,15 @@ bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
 });
 
+#[embassy_executor::task]
+async fn sensor_reading_testing(rx_ch: embassy_sync::channel::Receiver<'static, CriticalSectionRawMutex, [u8; 12], CHANNEL_SIZE>) {
+    loop {
+        let message = rx_ch.receive().await;
+        let sensor = SensorReadings::from_bytes(message);
+        log::info!("{:?}", sensor);
+    }
+}
+
 
 #[embassy_executor::task]
 async fn cyw43_task(runner: cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO0, 0, DMA_CH0>>) -> ! {
@@ -45,12 +53,12 @@ async fn net_task(mut runner: embassy_net::Runner<'static, cyw43::NetDriver<'sta
     runner.run().await
 }
 
-/*
+
 #[embassy_executor::task]
 pub async fn logger_task(driver: Driver<'static, USB>) {
     embassy_usb_logger::run!(1024, log::LevelFilter::Info, driver);
 }
-*/
+
 
 #[embassy_executor::task]
 pub async fn usb_task(mut usb: embassy_usb::UsbDevice<'static, Driver<'static, USB>>) -> ! {
@@ -64,10 +72,13 @@ async fn main(spawner: Spawner) {
 
     // Config USB port
     let driver = Driver::new(p.USB, Irqs);
-    // unwrap!(spawner.spawn(logger_task(driver)));
+    unwrap!(spawner.spawn(logger_task(driver)));
+
+    /*
     let (usb, hid_mouse, hid_keyboard, hid_media) = config_usb(driver);
     unwrap!(spawner.spawn(usb_task(usb)));
     unwrap!(spawner.spawn(hid_usb_controller(hid_mouse, hid_keyboard, hid_media)));
+    */
 
     // cyw43 wifi chip init
     let fw = include_bytes!("../../firmware/cyw43-firmware/43439A0.bin");
@@ -105,4 +116,7 @@ async fn main(spawner: Spawner) {
     let rx_ch = CHANNEL.receiver();
 
     unwrap!(spawner.spawn(tcp_server_task(control, stack, tx_ch)));
+
+    unwrap!(spawner.spawn(sensor_reading_testing(rx_ch)));
+
 }

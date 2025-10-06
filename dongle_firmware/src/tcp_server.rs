@@ -8,15 +8,13 @@ use embassy_net::{
     tcp::TcpSocket,
     StackResources,
 };
-use embassy_time::Duration;
 use embassy_sync::{
     channel::Sender,
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
 use embedded_io_async::Write;
-use heapless::{String, Vec};
 use static_cell::StaticCell;
-use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, DONGLE_IP, MessageArr, CHANNEL_SIZE};
+use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, SOCKET_TIMEOUT, DONGLE_IP, MessageArr, CHANNEL_SIZE};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
@@ -54,7 +52,7 @@ pub async fn tcp_server_task(
 
     loop {
         let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-        socket.set_timeout(Some(Duration::from_secs(10)));
+        socket.set_timeout(Some(SOCKET_TIMEOUT));
 
         control.gpio_set(0, false).await;
         log::info!("Listening on TCP: {TCP_ENDPOINT}...");
@@ -77,7 +75,8 @@ pub async fn tcp_server_task(
                     break;
                 }
                 Ok(idx) => {
-                    let message: [u8;12] = &buf[..idx];
+                    let mut message: MessageArr = [0;12];
+                    message.copy_from_slice(&buf[..idx]);
                     tx_ch.send(message).await;
                 },
             };

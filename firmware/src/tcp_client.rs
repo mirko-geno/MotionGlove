@@ -16,7 +16,7 @@ use embassy_sync::{
 use embassy_time::{Timer, Duration, with_timeout};
 use embedded_io_async::Write;
 use static_cell::StaticCell;
-use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT, MessageArr, CHANNEL_SIZE};
+use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT, SOCKET_TIMEOUT, MessageArr, CHANNEL_SIZE};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
@@ -83,7 +83,7 @@ mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'st
 
         loop {
             let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-            socket.set_timeout(Some(Duration::from_secs(10)));
+            socket.set_timeout(Some(SOCKET_TIMEOUT));
 
             control.gpio_set(0, false).await; // LED off
             log::info!("Connecting to TCP...");
