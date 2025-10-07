@@ -12,6 +12,7 @@ use embassy_rp::{
     pio::{InterruptHandler, Pio},
     usb::{self, Driver},
 };
+use embassy_usb::class::cdc_acm::CdcAcmClass;
 use embassy_sync::{
     channel::Channel,
     blocking_mutex::raw::CriticalSectionRawMutex,
@@ -53,15 +54,13 @@ async fn net_task(mut runner: embassy_net::Runner<'static, cyw43::NetDriver<'sta
     runner.run().await
 }
 
-
 #[embassy_executor::task]
-pub async fn logger_task(driver: Driver<'static, USB>) {
-    embassy_usb_logger::run!(1024, log::LevelFilter::Info, driver);
+async fn logger_task(logger: CdcAcmClass<'static, Driver<'static, USB>>) {
+    embassy_usb_logger::with_class!(1024, log::LevelFilter::Info, logger).await
 }
 
-
 #[embassy_executor::task]
-pub async fn usb_task(mut usb: embassy_usb::UsbDevice<'static, Driver<'static, USB>>) -> ! {
+async fn usb_task(mut usb: embassy_usb::UsbDevice<'static, Driver<'static, USB>>) -> ! {
     usb.run().await
 }
 
@@ -72,13 +71,10 @@ async fn main(spawner: Spawner) {
 
     // Config USB port
     let driver = Driver::new(p.USB, Irqs);
-    unwrap!(spawner.spawn(logger_task(driver)));
-
-    /*
-    let (usb, hid_mouse, hid_keyboard, hid_media) = config_usb(driver);
+    let (usb, logger, hid_mouse, hid_keyboard, hid_media) = config_usb(driver);
     unwrap!(spawner.spawn(usb_task(usb)));
+    unwrap!(spawner.spawn(logger_task(logger)));
     unwrap!(spawner.spawn(hid_usb_controller(hid_mouse, hid_keyboard, hid_media)));
-    */
 
     // cyw43 wifi chip init
     let fw = include_bytes!("../../firmware/cyw43-firmware/43439A0.bin");

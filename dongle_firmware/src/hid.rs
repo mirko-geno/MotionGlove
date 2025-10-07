@@ -3,9 +3,13 @@ use embassy_rp::{
     usb::Driver,
 };
 use embassy_usb::{
-    class::hid::{self, HidReaderWriter},
+    class::{
+        hid::{HidReaderWriter, Config as HidConfig, State as HidState},
+        cdc_acm::{CdcAcmClass, State as CdcState},
+    },
     UsbDevice
 };
+use embassy_usb_logger::MAX_PACKET_SIZE;
 use embassy_time::Timer;
 use usbd_hid::descriptor::{MouseReport, KeyboardReport, KeyboardUsage, MediaKeyboardReport, MediaKey, SerializedDescriptor};
 use static_cell::StaticCell;
@@ -18,9 +22,10 @@ static BOS_DESCRIPTOR: StaticCell<[u8; 256]> = StaticCell::new();
 static MSOS_DESCRIPTOR: StaticCell<[u8; 256]> = StaticCell::new();
 static CONTROL_BUF: StaticCell<[u8; 64]> = StaticCell::new();
 
-type HidDevice = HidReaderWriter<'static, embassy_rp::usb::Driver<'static, USB>, 1, 8>;
+type HidDevice = HidReaderWriter<'static, Driver<'static, USB>, 1, 8>;
+type LoggerDevice = CdcAcmClass<'static, Driver<'static, USB>>;
 
-pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, embassy_rp::usb::Driver<'static, USB>>, HidDevice, HidDevice, HidDevice) {
+pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'static, USB>>, LoggerDevice, HidDevice, HidDevice, HidDevice) {
     // Create embassy-usb Config
     let mut config  = embassy_usb::Config::new(0xc0de, 0xcafe);
     config.manufacturer = Some("LosDos");
@@ -45,10 +50,15 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, embassy_r
         control_buf,
     );
 
+    // USB Logger config
+    static USB_LOGGER: StaticCell<CdcState<'static>> = StaticCell::new();
+    let logger_state = USB_LOGGER.init(CdcState::new());
+    let logger = CdcAcmClass::new(&mut builder, logger_state, MAX_PACKET_SIZE.into());
+
     // Mouse config
-    static MOUSE_STATE: StaticCell<hid::State> = StaticCell::new();
-    let mouse_state = MOUSE_STATE.init(hid::State::new());
-    let mouse_config = embassy_usb::class::hid::Config {
+    static MOUSE_STATE: StaticCell<HidState> = StaticCell::new();
+    let mouse_state = MOUSE_STATE.init(HidState::new());
+    let mouse_config = HidConfig {
         report_descriptor: MouseReport::desc(),
         request_handler: None,
         poll_ms: 60,
@@ -57,9 +67,9 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, embassy_r
     let hid_mouse = HidReaderWriter::<_, 1, 8>::new(&mut builder, mouse_state, mouse_config);
 
     // Keyboard config
-    static KEYBOARD_STATE: StaticCell<hid::State> = StaticCell::new();
-    let keyboard_state = KEYBOARD_STATE.init(hid::State::new());
-    let keyboard_config = embassy_usb::class::hid::Config {
+    static KEYBOARD_STATE: StaticCell<HidState> = StaticCell::new();
+    let keyboard_state = KEYBOARD_STATE.init(HidState::new());
+    let keyboard_config = HidConfig {
         report_descriptor: KeyboardReport::desc(),
         request_handler: None,
         poll_ms: 10,
@@ -68,9 +78,9 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, embassy_r
     let hid_keyboard = HidReaderWriter::<_, 1, 8>::new(&mut builder, keyboard_state, keyboard_config);
 
     // MediaKeyboard config
-    static MEDIA_KEYBOARD_STATE: StaticCell<hid::State> = StaticCell::new();
-    let media_state = MEDIA_KEYBOARD_STATE.init(hid::State::new());
-    let media_config = embassy_usb::class::hid::Config {
+    static MEDIA_KEYBOARD_STATE: StaticCell<HidState> = StaticCell::new();
+    let media_state = MEDIA_KEYBOARD_STATE.init(HidState::new());
+    let media_config = HidConfig {
         report_descriptor: MediaKeyboardReport::desc(),
         request_handler: None,
         poll_ms: 10,
@@ -81,7 +91,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, embassy_r
     // USB Build
     let usb = builder.build();
 
-    (usb, hid_mouse, hid_keyboard, hid_media)
+    (usb, logger, hid_mouse, hid_keyboard, hid_media)
 }
 
 
@@ -108,7 +118,7 @@ pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidD
             keycodes: [0, 0, 0, 0, 0, 0], // None
         };
         let media_report = MediaKeyboardReport {
-            usage_id: MediaKey::PlayPause.into() // Pause / Play button
+            usage_id: MediaKey::Zero.into() // Pause / Play button
         };
         let release_media_report = MediaKeyboardReport {
             usage_id: MediaKey::Zero.into()
