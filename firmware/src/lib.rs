@@ -18,7 +18,7 @@ pub const TCP_ENDPOINT: u16 = 50124;
 pub const SOCKET_TIMEOUT: Duration = Duration::from_secs(15);
 pub const DONGLE_IP: &str = "169.254.1.1";
 pub const SENDER_IP: &str = "169.254.1.2";
-pub const CHANNEL_SIZE: usize = 2;
+pub const CHANNEL_SIZE: usize = 1;
 pub const READ_FREQ: u64 = 1;
 pub type MessageArr = [u8;12];
 

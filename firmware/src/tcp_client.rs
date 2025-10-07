@@ -96,6 +96,7 @@ mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'st
             log::info!("Connected to {:?}", socket.remote_endpoint());
             control.gpio_set(0, true).await; // LED on
 
+            // Communication loop
             loop {
                 message = rx_ch.receive().await;
                 if let Err(e) = socket.write_all(&message).await {

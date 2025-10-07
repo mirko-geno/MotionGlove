@@ -65,7 +65,8 @@ pub async fn tcp_server_task(
         control.gpio_set(0, true).await;
 
         loop {
-            let _ = match socket.read(&mut buf).await {
+            // Receives data from TCP Client
+            match socket.read(&mut buf).await {
                 Err(e) => {
                     log::warn!("read error: {:?}", e);
                     break;
@@ -75,19 +76,11 @@ pub async fn tcp_server_task(
                     break;
                 }
                 Ok(idx) => {
+                    log::info!("Received {} bytes: {:?}", idx, &buf[..idx]);
                     let mut message: MessageArr = [0;12];
-                    message.copy_from_slice(&buf[..idx]);
+                    message.copy_from_slice(&buf[..idx]); // Panics if &buf[..idx] != [u8;12]
                     tx_ch.send(message).await;
                 },
-            };
-            // log::info!("Received: {}", from_utf8(&buf[..n]).unwrap());
-            
-            match socket.write_all(b"Ok").await {
-                Err(e) => {
-                    log::warn!("write error: {:?}", e);
-                    break;
-                }
-                Ok(()) => {}
             };
         }
     }
