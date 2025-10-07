@@ -24,8 +24,8 @@ pub type MessageArr = [u8;12];
 
 #[derive(Debug)]
 pub struct SensorReadings {
-    accel: Accel,
-    gyro: Gyro,
+    pub accel: Accel,
+    pub gyro: Gyro,
 }
 
 impl SensorReadings {

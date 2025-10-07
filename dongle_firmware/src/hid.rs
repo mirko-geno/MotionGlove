@@ -10,10 +10,15 @@ use embassy_usb::{
     UsbDevice
 };
 use embassy_usb_logger::MAX_PACKET_SIZE;
-use embassy_time::Timer;
+use embassy_sync::{
+    channel::Receiver,
+    blocking_mutex::raw::CriticalSectionRawMutex,
+};
 use usbd_hid::descriptor::{MouseReport, KeyboardReport, KeyboardUsage, MediaKeyboardReport, MediaKey, SerializedDescriptor};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
+
+use firmware::{SensorReadings, MessageArr, CHANNEL_SIZE};
 
 
 // USB Descriptors
@@ -96,15 +101,23 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
 
 
 #[embassy_executor::task]
-pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidDevice, mut hid_media: HidDevice) -> ! {
+pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidDevice, mut hid_media: HidDevice,
+rx_ch: Receiver<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>) -> ! {
     loop {
+        let message = rx_ch.receive().await;
+        let sensor = SensorReadings::from_bytes(message);
+        log::info!("{:?}", sensor);
         let mouse_report = MouseReport {
             buttons: 0,
-            x: 5,
-            y: 3,
+            x: sensor.accel.x() as i8,
+            y: sensor.accel.y() as i8,
             wheel: 0,
             pan: 0,
         };
+        if let Err(e) = hid_mouse.write_serialize(&mouse_report).await {
+            log::warn!("Failed to send mouse report: {:?}", e);
+        }
+        /*
         let keyboard_report = KeyboardReport {
             modifier: 0,
             reserved: 0,
@@ -123,9 +136,6 @@ pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidD
         let release_media_report = MediaKeyboardReport {
             usage_id: MediaKey::Zero.into()
         };
-        if let Err(e) = hid_mouse.write_serialize(&mouse_report).await {
-            log::warn!("Failed to send mouse report: {:?}", e);
-        }
         if let Err(e) = hid_keyboard.write_serialize(&keyboard_report).await {
             log::warn!("Failed to send keyboard report: {:?}", e);
         }
@@ -138,6 +148,6 @@ pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidD
         if let Err(e) = hid_media.write_serialize(&release_media_report).await {
             log::warn!("Failed to release keyboard report: {:?}", e);
         }
-        Timer::after_secs(1).await
+        */
     }
 }

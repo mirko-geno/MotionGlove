@@ -35,7 +35,7 @@ bind_interrupts!(struct Irqs {
 });
 
 #[embassy_executor::task]
-async fn sensor_reading_testing(rx_ch: embassy_sync::channel::Receiver<'static, CriticalSectionRawMutex, [u8; 12], CHANNEL_SIZE>) {
+async fn sensor_reading_testing(rx_ch: embassy_sync::channel::Receiver<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>) {
     loop {
         let message = rx_ch.receive().await;
         let sensor = SensorReadings::from_bytes(message);
@@ -72,9 +72,11 @@ async fn main(spawner: Spawner) {
     // Config USB port
     let driver = Driver::new(p.USB, Irqs);
     let (usb, logger, hid_mouse, hid_keyboard, hid_media) = config_usb(driver);
+
+    // Launch usb and usb logger tasks
     unwrap!(spawner.spawn(usb_task(usb)));
     unwrap!(spawner.spawn(logger_task(logger)));
-    unwrap!(spawner.spawn(hid_usb_controller(hid_mouse, hid_keyboard, hid_media)));
+    log::info!("USB Logger set up");
 
     // cyw43 wifi chip init
     let fw = include_bytes!("../../firmware/cyw43-firmware/43439A0.bin");
@@ -111,8 +113,8 @@ async fn main(spawner: Spawner) {
     let tx_ch = CHANNEL.sender();
     let rx_ch = CHANNEL.receiver();
 
+    // Launch hid controller with channel receiver
+    unwrap!(spawner.spawn(hid_usb_controller(hid_mouse, hid_keyboard, hid_media, rx_ch)));
+    // Launch TCP task with channel sender
     unwrap!(spawner.spawn(tcp_server_task(control, stack, tx_ch)));
-
-    unwrap!(spawner.spawn(sensor_reading_testing(rx_ch)));
-
 }
