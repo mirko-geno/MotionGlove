@@ -12,7 +12,6 @@ use embassy_sync::{
     channel::Sender,
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
-use embedded_io_async::Write;
 use static_cell::StaticCell;
 use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, SOCKET_TIMEOUT, DONGLE_IP, MessageArr, CHANNEL_SIZE};
 
