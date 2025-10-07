@@ -7,6 +7,7 @@ target = "thumbv6m-none-eabi"        # Cortex-M0 and Cortex-M0+
 
 [env]
 DEFMT_LOG = "debug"
+EMBASSY_USB_MAX_INTERFACE_COUNT = "5"   # Modified to add custom logger
 
 [profile.release]
 debug = 2
