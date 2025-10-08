@@ -78,7 +78,9 @@ pub async fn tcp_server_task(
                     let received = &buf[..idx];
                     log::info!("Received {} bytes: {:?}", idx, received);
                     let (chunks, _) = received.as_chunks::<12>(); // As chunks of len 12
-                    chunks.iter().map(async |chunk| {tx_ch.send(*chunk).await});
+                    for chunk in chunks {
+                        tx_ch.send(*chunk).await;
+                    };
                 },
             };
         }

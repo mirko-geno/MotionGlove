@@ -66,7 +66,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let mouse_config = HidConfig {
         report_descriptor: MouseReport::desc(),
         request_handler: None,
-        poll_ms: 60,
+        poll_ms: 1/READ_FREQ,
         max_packet_size: 64,
     };
     let hid_mouse = HidReaderWriter::<_, 1, 8>::new(&mut builder, mouse_state, mouse_config);
@@ -77,7 +77,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let keyboard_config = HidConfig {
         report_descriptor: KeyboardReport::desc(),
         request_handler: None,
-        poll_ms: 10,
+        poll_ms: 1/READ_FREQ,
         max_packet_size: 64,
     };
     let hid_keyboard = HidReaderWriter::<_, 1, 8>::new(&mut builder, keyboard_state, keyboard_config);
@@ -88,7 +88,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let media_config = HidConfig {
         report_descriptor: MediaKeyboardReport::desc(),
         request_handler: None,
-        poll_ms: 10,
+        poll_ms: 1/READ_FREQ,
         max_packet_size: 64,
     };
     let hid_media = HidReaderWriter::<_, 1, 8>::new(&mut builder, media_state, media_config);
@@ -106,7 +106,6 @@ rx_ch: Receiver<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>) -> 
     loop {
         let message = rx_ch.receive().await;
         let sensor = SensorReadings::from_bytes(message);
-        log::info!("{:?}", sensor);
         let mouse_report = MouseReport {
             buttons: 0,
             x: sensor.accel.x() as i8,
