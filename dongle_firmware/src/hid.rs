@@ -17,8 +17,9 @@ use embassy_sync::{
 use usbd_hid::descriptor::{MouseReport, KeyboardReport, KeyboardUsage, MediaKeyboardReport, MediaKey, SerializedDescriptor};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
+use libm::{cos, sin, round};
 
-use firmware::{SensorReadings, MessageArr, CHANNEL_SIZE};
+use firmware::{CHANNEL_SIZE, MessageArr, READ_FREQ, SensorReadings};
 
 
 // USB Descriptors
@@ -66,7 +67,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let mouse_config = HidConfig {
         report_descriptor: MouseReport::desc(),
         request_handler: None,
-        poll_ms: 1/READ_FREQ,
+        poll_ms: 1,
         max_packet_size: 64,
     };
     let hid_mouse = HidReaderWriter::<_, 1, 8>::new(&mut builder, mouse_state, mouse_config);
@@ -77,7 +78,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let keyboard_config = HidConfig {
         report_descriptor: KeyboardReport::desc(),
         request_handler: None,
-        poll_ms: 1/READ_FREQ,
+        poll_ms: 1,
         max_packet_size: 64,
     };
     let hid_keyboard = HidReaderWriter::<_, 1, 8>::new(&mut builder, keyboard_state, keyboard_config);
@@ -88,7 +89,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let media_config = HidConfig {
         report_descriptor: MediaKeyboardReport::desc(),
         request_handler: None,
-        poll_ms: 1/READ_FREQ,
+        poll_ms: 1,
         max_packet_size: 64,
     };
     let hid_media = HidReaderWriter::<_, 1, 8>::new(&mut builder, media_state, media_config);
@@ -103,13 +104,18 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
 #[embassy_executor::task]
 pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidDevice, mut hid_media: HidDevice,
 rx_ch: Receiver<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>) -> ! {
+    let mut pitch = 0.0;
     loop {
         let message = rx_ch.receive().await;
         let sensor = SensorReadings::from_bytes(message);
+        let pitch_dot = (sensor.gyro.y() as f64) * cos(pitch) - (sensor.gyro.z() as f64) * sin(pitch);
+        pitch = pitch + pitch_dot / READ_FREQ as f64;
+        log::info!("pitch = {:?}", &pitch);
+
         let mouse_report = MouseReport {
             buttons: 0,
-            x: sensor.accel.x() as i8,
-            y: sensor.accel.y() as i8,
+            x: 0,
+            y: round(pitch) as i8,
             wheel: 0,
             pan: 0,
         };

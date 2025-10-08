@@ -637,6 +637,7 @@ dependencies = [
  "embedded-io-async",
  "firmware",
  "heapless",
+ "libm",
  "log",
  "panic-probe",
  "portable-atomic",
