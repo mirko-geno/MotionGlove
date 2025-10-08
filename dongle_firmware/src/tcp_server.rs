@@ -75,10 +75,10 @@ pub async fn tcp_server_task(
                     break;
                 }
                 Ok(idx) => {
-                    log::info!("Received {} bytes: {:?}", idx, &buf[..idx]);
-                    let mut message: MessageArr = [0;12];
-                    message.copy_from_slice(&buf[..idx]); // Panics if &buf[..idx] != [u8;12]
-                    tx_ch.send(message).await;
+                    let received = &buf[..idx];
+                    log::info!("Received {} bytes: {:?}", idx, received);
+                    let (chunks, _) = received.as_chunks::<12>(); // As chunks of len 12
+                    chunks.iter().map(async |chunk| {tx_ch.send(*chunk).await});
                 },
             };
         }
