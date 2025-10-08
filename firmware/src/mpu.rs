@@ -17,8 +17,8 @@ use crate::{SensorReadings, CHANNEL_SIZE, READ_FREQ, MessageArr};
 
 async fn calibrate_sensor(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
     let calibration_params = CalibrationParameters::new(
-        mpu6050_dmp::accel::AccelFullScale::G2,
-        mpu6050_dmp::gyro::GyroFullScale::Deg2000,
+        mpu6050_dmp::accel::AccelFullScale::G8,
+        mpu6050_dmp::gyro::GyroFullScale::Deg500,
         mpu6050_dmp::calibration::ReferenceGravity::Zero,
     );
 
