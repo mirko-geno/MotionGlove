@@ -28,7 +28,9 @@ embedded-io-async   = { version = "0.6.1", features = ["defmt-03"] }
 
 static_cell         = "2.1"
 portable-atomic     = { version = "1.5", features = ["critical-section"] }
-log = "0.4"
+log                 = "0.4"
+heapless            = "0.8.0"
+usbd-hid            = "0.8.1"
 
 mpu6050-dmp         = { git = "https://github.com/barafael/mpu6050-dmp-rs.git", features = ["async"]}
-heapless            = "0.8.0"
+

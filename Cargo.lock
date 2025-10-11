@@ -1040,6 +1040,7 @@ dependencies = [
  "panic-probe",
  "portable-atomic",
  "static_cell",
+ "usbd-hid",
 ]
 
 [[package]]
