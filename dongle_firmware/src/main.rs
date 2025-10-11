@@ -26,23 +26,13 @@ use dongle_firmware::{
     hid::{config_usb, hid_usb_controller}
 };
 
-use firmware::{SensorReadings, MessageArr, CHANNEL_SIZE};
+use firmware::{HidInstruction, CHANNEL_SIZE};
 
 
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
 });
-
-#[embassy_executor::task]
-async fn sensor_reading_testing(rx_ch: embassy_sync::channel::Receiver<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>) {
-    loop {
-        let message = rx_ch.receive().await;
-        let sensor = SensorReadings::from_bytes(message);
-        log::info!("{:?}", sensor);
-    }
-}
-
 
 #[embassy_executor::task]
 async fn cyw43_task(runner: cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO0, 0, DMA_CH0>>) -> ! {
@@ -109,7 +99,7 @@ async fn main(spawner: Spawner) {
     let (stack, runner) = network_config(net_device);
     unwrap!(spawner.spawn(net_task(runner)));
 
-    static CHANNEL: Channel<CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE> = Channel::new();
+    static CHANNEL: Channel<CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE> = Channel::new();
     let tx_ch = CHANNEL.sender();
     let rx_ch = CHANNEL.receiver();
 

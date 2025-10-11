@@ -14,12 +14,11 @@ use embassy_sync::{
     channel::Receiver,
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
-use usbd_hid::descriptor::{MouseReport, KeyboardReport, KeyboardUsage, MediaKeyboardReport, MediaKey, SerializedDescriptor};
+use usbd_hid::descriptor::{MouseReport, KeyboardReport, MediaKeyboardReport, MediaKey, SerializedDescriptor};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
-use libm::{cos, sin, round};
 
-use firmware::{CHANNEL_SIZE, MessageArr, READ_FREQ, SensorReadings};
+use firmware::{CHANNEL_SIZE, HidInstruction};
 
 
 // USB Descriptors
@@ -103,56 +102,33 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
 
 #[embassy_executor::task]
 pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidDevice, mut hid_media: HidDevice,
-rx_ch: Receiver<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>) -> ! {
-    let mut pitch = 0.0;
+rx_ch: Receiver<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>) -> ! {
     loop {
-        let message = rx_ch.receive().await;
-        let sensor = SensorReadings::from_bytes(message);
-        let pitch_dot = (sensor.gyro.y() as f64) * cos(pitch) - (sensor.gyro.z() as f64) * sin(pitch);
-        pitch = pitch + pitch_dot / READ_FREQ as f64;
-        log::info!("pitch = {:?}", &pitch);
-
-        let mouse_report = MouseReport {
-            buttons: 0,
-            x: 0,
-            y: round(pitch) as i8,
-            wheel: 0,
-            pan: 0,
-        };
-        if let Err(e) = hid_mouse.write_serialize(&mouse_report).await {
-            log::warn!("Failed to send mouse report: {:?}", e);
-        }
-        /*
-        let keyboard_report = KeyboardReport {
-            modifier: 0,
-            reserved: 0,
-            leds: 0,
-            keycodes: [KeyboardUsage::KeyboardAa as u8, 0, 0, 0, 0, 0]
-        };
-        let release_keyboard_report = KeyboardReport {
+        let hid_instruction = rx_ch.receive().await;
+        let release_keyboard = KeyboardReport {
             modifier: 0,
             reserved: 0,
             leds: 0,
             keycodes: [0, 0, 0, 0, 0, 0], // None
         };
-        let media_report = MediaKeyboardReport {
-            usage_id: MediaKey::Zero.into() // Pause / Play button
-        };
-        let release_media_report = MediaKeyboardReport {
+        let release_media = MediaKeyboardReport {
             usage_id: MediaKey::Zero.into()
         };
-        if let Err(e) = hid_keyboard.write_serialize(&keyboard_report).await {
+
+        if let Err(e) = hid_mouse.write_serialize(&hid_instruction.mouse).await {
+            log::warn!("Failed to send mouse report: {:?}", e);
+        }
+        if let Err(e) = hid_keyboard.write_serialize(&hid_instruction.keyboard).await {
             log::warn!("Failed to send keyboard report: {:?}", e);
         }
-        if let Err(e) = hid_keyboard.write_serialize(&release_keyboard_report).await {
+        if let Err(e) = hid_keyboard.write_serialize(&release_keyboard).await {
             log::warn!("Failed to release keyboard report: {:?}", e);
         }
-        if let Err(e) = hid_media.write_serialize(&media_report).await {
+        if let Err(e) = hid_media.write_serialize(&hid_instruction.media).await {
             log::warn!("Failed to send keyboard report: {:?}", e);
         }
-        if let Err(e) = hid_media.write_serialize(&release_media_report).await {
+        if let Err(e) = hid_media.write_serialize(&release_media).await {
             log::warn!("Failed to release keyboard report: {:?}", e);
         }
-        */
     }
 }

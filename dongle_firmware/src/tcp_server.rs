@@ -13,7 +13,7 @@ use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
 use static_cell::StaticCell;
-use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, SOCKET_TIMEOUT, DONGLE_IP, MessageArr, CHANNEL_SIZE};
+use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, SOCKET_TIMEOUT, DONGLE_IP, HidInstruction, CHANNEL_SIZE};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
@@ -37,7 +37,7 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 
 #[embassy_executor::task]
 pub async fn tcp_server_task(
-    mut control: cyw43::Control<'static>, stack: Stack<'static>, tx_ch: Sender<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>
+    mut control: cyw43::Control<'static>, stack: Stack<'static>, tx_ch: Sender<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
     //control.start_ap_open("cyw43", 5).await;
     control.start_ap_wpa2(WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL).await;
@@ -76,10 +76,11 @@ pub async fn tcp_server_task(
                 }
                 Ok(idx) => {
                     let received = &buf[..idx];
-                    log::info!("Received {} bytes: {:?}", idx, received);
-                    let (chunks, _) = received.as_chunks::<12>(); // As chunks of len 12
+                    // log::info!("Received {} bytes: {:?}", idx, received);
+                    let (chunks, _) = received.as_chunks::<16>(); // As chunks of len 16
                     for chunk in chunks {
-                        tx_ch.send(*chunk).await;
+                        let hid_instruction = HidInstruction::from_be_bytes(*chunk);
+                        tx_ch.send(hid_instruction).await;
                     };
                 },
             };

@@ -3,10 +3,6 @@
 
 use embassy_time::Duration;
 use embassy_rp::gpio::{Input, Level};
-use mpu6050_dmp::{
-    accel::Accel,
-    gyro::Gyro,
-};
 use usbd_hid::descriptor::{
     MouseReport,
     KeyboardReport,
@@ -57,8 +53,8 @@ pub struct HidInstruction {
 }
 
 impl HidInstruction {
-    /// Build HidInstruction from big endian bytes
-    pub fn from_be_bytes(data: [u8;16]) -> Self {
+    /// Build HidInstruction from big endian bytes [u8;16]
+    pub fn from_be_bytes(data: HidInstructionArr) -> Self {
         let mouse = MouseReport {
             buttons:    u8::from_be(data[0]),
             x:          u8::from_be(data[1]) as i8,
@@ -79,8 +75,8 @@ impl HidInstruction {
         HidInstruction { mouse, keyboard, media }
     }
 
-    /// Converts HidInstruction to big endian bytes
-    pub fn to_be_bytes(&self) -> [u8; 16] {
+    /// Converts HidInstruction to big endian bytes [u8;16]
+    pub fn to_be_bytes(&self) -> HidInstructionArr {
         let mouse_buttons            = self.mouse.buttons.to_be();
         let mouse_x                  = (self.mouse.x as u8).to_be();
         let mouse_y                  = (self.mouse.y as u8).to_be();
@@ -104,43 +100,3 @@ impl HidInstruction {
     }
 }
 
-
-#[derive(Debug)]
-pub struct SensorReadings {
-    pub accel: Accel,
-    pub gyro: Gyro,
-}
-
-impl SensorReadings {
-    /// Builds a message from Accelerometer and Gyroscope readings
-    /// Accel (x, y, z)
-    /// Gyro (x, y, z)
-    pub fn from(accel: Accel, gyro: Gyro) -> Self {
-        SensorReadings { accel, gyro }
-    }
-
-    /// Builds Message type from [u8;12] Array
-    pub const fn from_bytes(data: [u8; 12]) -> Self {
-        let accel   = [data[0], data[1], data[2], data[3], data[4], data[5]];
-        let gyro    = [data[6], data[7], data[8], data[9], data[10], data[11]];
-
-        Self {
-            accel: Accel::from_bytes(accel),
-            gyro: Gyro::from_bytes(gyro),
-        }
-    }
-    
-    /// Returns full message as [u8;12]
-    pub const fn as_bytes(&self) -> [u8; 12] {
-        let accel_x = self.accel.x().to_be_bytes();
-        let accel_y = self.accel.y().to_be_bytes();
-        let accel_z = self.accel.z().to_be_bytes();
-        let gyro_x  = self.gyro.x().to_be_bytes();
-        let gyro_y  = self.gyro.y().to_be_bytes();
-        let gyro_z  = self.gyro.z().to_be_bytes();
-        [
-            accel_x[0], accel_x[1], accel_y[0], accel_y[1], accel_z[0], accel_z[1],
-            gyro_x[0], gyro_x[1], gyro_y[0], gyro_y[1], gyro_z[0], gyro_z[1],
-        ]
-    }
-}

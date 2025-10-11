@@ -34,5 +34,4 @@ portable-atomic     = { version = "1.5", features = ["critical-section"] }
 log                 = "0.4"
 heapless            = "0.8"
 usbd-hid            = "0.8.1"
-libm                = "0.2.15"
 

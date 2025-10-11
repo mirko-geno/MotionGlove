@@ -25,8 +25,8 @@ use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
 use firmware::{
     // blinker::blink_task,
     tcp_client::{network_config, tcp_client_task},
-    mpu::read_mpu,
-    MessageArr, CHANNEL_SIZE,
+    sensors::{configure_mpu, sensor_processing},
+    HidInstruction, CHANNEL_SIZE,
 };
 
 bind_interrupts!(struct Irqs {
@@ -93,7 +93,7 @@ async fn main(spawner: Spawner) {
     let (stack, runner) = network_config(net_device);
     unwrap!(spawner.spawn(net_task(runner)));
 
-    static CHANNEL: Channel<CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE> = Channel::new();
+    static CHANNEL: Channel<CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE> = Channel::new();
     let tx_ch = CHANNEL.sender();
     let rx_ch = CHANNEL.receiver();
 
@@ -105,6 +105,7 @@ async fn main(spawner: Spawner) {
 
     let i2c_config = i2c::Config::default();
     let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);
-    let mpu = Mpu6050::new(i2c_bus, Address::default()).await.unwrap();
-    unwrap!(spawner.spawn(read_mpu(mpu, tx_ch)));
+    let mut mpu = Mpu6050::new(i2c_bus, Address::default()).await.unwrap();
+    configure_mpu(&mut mpu).await;
+    unwrap!(spawner.spawn(sensor_processing(mpu, tx_ch)));
 }

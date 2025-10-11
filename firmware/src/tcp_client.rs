@@ -16,7 +16,7 @@ use embassy_sync::{
 use embassy_time::{Timer, Duration, with_timeout};
 use embedded_io_async::Write;
 use static_cell::StaticCell;
-use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT, SOCKET_TIMEOUT, MessageArr, CHANNEL_SIZE};
+use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT, SOCKET_TIMEOUT, HidInstruction, CHANNEL_SIZE};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
@@ -40,11 +40,11 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 
 #[embassy_executor::task]
 pub async fn tcp_client_task(
-mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'static, CriticalSectionRawMutex, MessageArr, CHANNEL_SIZE>
+mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
-    let mut message: MessageArr;
+    let mut hid_instruction: HidInstruction;
 
     // Try wifi connection
     loop {
@@ -74,7 +74,7 @@ mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'st
         log::info!("Waiting for DHCP...");
         stack.wait_config_up().await;
 
-        // And now we can use it!
+        // Ready to use!
         log::info!("Stack is up!");
 
         // Clean buffers
@@ -98,12 +98,13 @@ mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'st
 
             // Communication loop
             loop {
-                message = rx_ch.receive().await;
-                if let Err(e) = socket.write_all(&message).await {
+                hid_instruction = rx_ch.receive().await;
+                let tcp_message = hid_instruction.to_be_bytes();
+                if let Err(e) = socket.write_all(&tcp_message).await {
                     log::warn!("Write error: {:?}", e);
                     break;
                 }
-                log::info!("sent: {:?}", (&message[..]));
+                log::info!("sent: {:?}", (&tcp_message[..]));
             }
         }
     }
