@@ -2,18 +2,18 @@
 #![no_main]
 
 use embassy_time::Duration;
+use embassy_rp::gpio::{Input, Level};
 use mpu6050_dmp::{
     accel::Accel,
-    gyro::Gyro, quaternion
+    gyro::Gyro,
 };
 use usbd_hid::descriptor::{
     MouseReport,
-    KeyboardReport, KeyboardUsage,
-    MediaKeyboardReport, MediaKey,
-    SerializedDescriptor
+    KeyboardReport,
+    MediaKeyboardReport,
 };
 
-pub mod mpu;
+pub mod sensors;
 pub mod blinker;
 pub mod tcp_client;
 
@@ -26,20 +26,37 @@ pub const DONGLE_IP: &str = "169.254.1.1";
 pub const SENDER_IP: &str = "169.254.1.2";
 pub const CHANNEL_SIZE: usize = 1;
 pub const READ_FREQ: u64 = 1000;
-pub type MessageArr = [u8;12];
+
+pub type HidInstructionArr = [u8;16];
+pub type FingerFlexes<'a> = [Input<'a>;5];
+
+pub trait Flexes {
+    fn get_level(&self) -> [Level;5];
+    fn get_bool_level(&self) -> [bool;5];
+}
+
+impl Flexes for FingerFlexes<'_> {
+    fn get_level(&self) -> [Level;5] {
+        [
+            self[0].get_level(), self[1].get_level(), self[2].get_level(),
+            self[3].get_level(), self[4].get_level()
+        ]
+    }
+    fn get_bool_level(&self) -> [bool;5] {
+        [
+            self[0].is_high(), self[1].is_high(), self[2].is_high(),
+            self[3].is_high(), self[4].is_high()
+        ]
+    }
+}
 
 pub struct HidInstruction {
-    mouse: MouseReport,
-    keyboard: KeyboardReport,
-    media: MediaKeyboardReport,
+    pub mouse: MouseReport,
+    pub keyboard: KeyboardReport,
+    pub media: MediaKeyboardReport,
 }
 
 impl HidInstruction {
-    /// Build HidInstruction from Reports (Mouse, Keyboard and Media)
-    pub fn from(mouse: MouseReport, keyboard: KeyboardReport, media: MediaKeyboardReport) -> Self {
-        HidInstruction { mouse, keyboard, media }
-    }
-
     /// Build HidInstruction from big endian bytes
     pub fn from_be_bytes(data: [u8;16]) -> Self {
         let mouse = MouseReport {
