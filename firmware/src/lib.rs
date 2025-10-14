@@ -2,7 +2,10 @@
 #![no_main]
 
 use embassy_time::Duration;
-use embassy_rp::gpio::{Input, Level};
+use embassy_rp::{
+    gpio::{Input, Level},
+    adc::{self, Adc},
+};
 use usbd_hid::descriptor::{
     MouseReport,
     KeyboardReport,
@@ -24,25 +27,24 @@ pub const CHANNEL_SIZE: usize = 1;
 pub const READ_FREQ: u64 = 1000;
 
 pub type HidInstructionArr = [u8;16];
-pub type FingerFlexes<'a> = [Input<'a>;5];
 
-pub trait Flexes {
-    fn get_level(&self) -> [Level;5];
-    fn get_bool_level(&self) -> [bool;5];
+pub struct FingerFlexes<'a> {
+    adc_driver: Adc<'a, adc::Async>,
+    thumb_flex: adc::Channel<'a>,
+    index_flex: adc::Channel<'a>,
+    middle_flex: adc::Channel<'a>,
 }
 
-impl Flexes for FingerFlexes<'_> {
-    fn get_level(&self) -> [Level;5] {
-        [
-            self[0].get_level(), self[1].get_level(), self[2].get_level(),
-            self[3].get_level(), self[4].get_level()
-        ]
+impl<'a> FingerFlexes<'a> {
+    pub fn new(adc_driver: Adc<'a, adc::Async>, thumb_flex: adc::Channel<'a>, index_flex: adc::Channel<'a>, middle_flex: adc::Channel<'a>,) -> Self{
+        FingerFlexes {adc_driver, thumb_flex, index_flex, middle_flex}
     }
-    fn get_bool_level(&self) -> [bool;5] {
-        [
-            self[0].is_high(), self[1].is_high(), self[2].is_high(),
-            self[3].is_high(), self[4].is_high()
-        ]
+
+    pub async fn read(&mut self) -> [u16;3] {
+        let thumb   = self.adc_driver.read(&mut self.thumb_flex).await.unwrap();
+        let index   = self.adc_driver.read(&mut self.index_flex).await.unwrap();
+        let middle  = self.adc_driver.read(&mut self.middle_flex).await.unwrap();
+        [thumb, index, middle]
     }
 }
 

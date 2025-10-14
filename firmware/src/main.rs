@@ -6,11 +6,12 @@ use {defmt_rtt as _, panic_probe as _};
 use embassy_executor::Spawner;
 use embassy_rp::{
     bind_interrupts,
-    gpio::{Level, Output},
+    gpio::{Level, Output, Pull},
     peripherals::{DMA_CH0, PIO0, I2C0, USB},
     pio::{self, Pio}, 
     i2c::{self, I2c},
     usb::{self, Driver},
+    adc::{self, Adc, Config as AdcConfig}
 };
 use embassy_sync::{
     channel::Channel,
@@ -24,16 +25,17 @@ use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
 
 use firmware::{
     // blinker::blink_task,
-    tcp_client::{network_config, tcp_client_task},
-    sensors::{configure_mpu, sensor_processing},
-    HidInstruction, CHANNEL_SIZE,
+    CHANNEL_SIZE, HidInstruction, FingerFlexes, sensors::{configure_mpu, sensor_processing}, tcp_client::{network_config, tcp_client_task}
 };
 
-bind_interrupts!(struct Irqs {
-    PIO0_IRQ_0 => pio::InterruptHandler<PIO0>;
-    I2C0_IRQ => i2c::InterruptHandler<I2C0>;
-    USBCTRL_IRQ => usb::InterruptHandler<USB>;
-});
+bind_interrupts!(
+    struct Irqs {
+        PIO0_IRQ_0 => pio::InterruptHandler<PIO0>;
+        I2C0_IRQ => i2c::InterruptHandler<I2C0>;
+        USBCTRL_IRQ => usb::InterruptHandler<USB>;
+        ADC_IRQ_FIFO => adc::InterruptHandler;
+    }
+);
 
 
 #[embassy_executor::task]
@@ -98,7 +100,15 @@ async fn main(spawner: Spawner) {
     let rx_ch = CHANNEL.receiver();
 
     unwrap!(spawner.spawn(tcp_client_task(control, stack, rx_ch)));
-    
+
+    // Instantiate ADC flex sensors
+    let adc_driver  = Adc::new(p.ADC, Irqs, AdcConfig::default());
+    let thumb_flex = adc::Channel::new_pin(p.PIN_28, Pull::Down);
+    let index_flex = adc::Channel::new_pin(p.PIN_27, Pull::Down);
+    let middle_flex  = adc::Channel::new_pin(p.PIN_26, Pull::Down);
+
+    let finger_flexes = FingerFlexes::new(adc_driver, thumb_flex, index_flex, middle_flex);
+
     // Instantiate mpu sensor
     let sda = p.PIN_4; // GP20, PIN26
     let scl = p.PIN_5; // GP21, PIN27
