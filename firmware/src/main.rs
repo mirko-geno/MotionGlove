@@ -117,5 +117,5 @@ async fn main(spawner: Spawner) {
     let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);
     let mut mpu = Mpu6050::new(i2c_bus, Address::default()).await.unwrap();
     configure_mpu(&mut mpu).await;
-    unwrap!(spawner.spawn(sensor_processing(mpu, tx_ch)));
+    unwrap!(spawner.spawn(sensor_processing(mpu, finger_flexes, tx_ch)));
 }

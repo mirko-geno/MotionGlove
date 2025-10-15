@@ -19,7 +19,7 @@ use usbd_hid::descriptor::{
     MediaKeyboardReport, MediaKey,
 };
 use libm::{cos, sin, round};
-use crate::{HidInstruction, CHANNEL_SIZE, READ_FREQ};
+use crate::{FingerFlexes, FingerReadings, HidInstruction, THUMB, INDEX, MIDDLE, CHANNEL_SIZE, READ_FREQ};
 
 async fn calibrate_mpu(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
     let calibration_params = CalibrationParameters::new(
@@ -42,7 +42,10 @@ pub async fn configure_mpu(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
     calibrate_mpu(mpu).await;
 }
 
-async fn read_sensors(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> (Accel, Gyro) {
+async fn read_sensors(
+    mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>,
+    finger_flexes: &mut FingerFlexes<'static>,
+) -> (Accel, Gyro, FingerReadings) {
     // Tries to get accel and gyro data from motion6, in case of error returns zeros
     let (accel, gyro) = match mpu.motion6().await {
         Err(e) => {
@@ -53,22 +56,31 @@ async fn read_sensors(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) -> (Acc
             readings
         }
     };
+    let flexes = match finger_flexes.read().await {
+        Err(e) => {
+            log::warn!("Error {:?} while reading ADC", {e});
+            [0,0,0] // Return empty readings
+        }
+        Ok(readings) => readings
+    };
     log::info!("Sensor Readings:");
+    log::info!("Thumb: {}\nIndex: {}\nMiddle: {}\n", flexes[THUMB], flexes[INDEX], flexes[MIDDLE]);
     log::info!("Accelerometer [mg]: x={}, y={}, z={}", accel.x(), accel.y(), accel.z());
     log::info!("Gyroscope [deg/s]: x={}, y={}, z={}", gyro.x(), gyro.y(), gyro.z());
     // tx_ch.send(readings.as_bytes()).await;
-    (accel, gyro)
+    (accel, gyro, flexes)
 }
 
 #[embassy_executor::task]
 pub async fn sensor_processing(
     mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>,
+    mut finger_flexes: FingerFlexes<'static>,
     tx_ch: Sender<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
     let mut pitch = 0.0;
     loop {
         // Read sensor data
-        let (accel, gyro) = read_sensors(&mut mpu).await;
+        let (_accel, gyro, _flexes) = read_sensors(&mut mpu, &mut finger_flexes).await;
 
         // Process sensors
         let pitch_dot = (gyro.y() as f64) * cos(pitch) - (gyro.z() as f64) * sin(pitch);
