@@ -2,6 +2,7 @@
 #![no_main]
 
 use defmt::*;
+use embassy_time::Delay;
 use {defmt_rtt as _, panic_probe as _};
 use embassy_executor::Spawner;
 use embassy_rp::{
@@ -21,7 +22,7 @@ use cyw43_pio::{PioSpi, DEFAULT_CLOCK_DIVIDER};
 
 use static_cell::StaticCell;
 
-use mpu6050_dmp::{address::Address, sensor_async::Mpu6050};
+use mpu9250_async::{address::Address, sensor_async::Mpu9250};
 
 use firmware::{
     // blinker::blink_task,
@@ -115,7 +116,7 @@ async fn main(spawner: Spawner) {
 
     let i2c_config = i2c::Config::default();
     let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);
-    let mut mpu = Mpu6050::new(i2c_bus, Address::default()).await.unwrap();
+    let mut mpu = Mpu9250::new(i2c_bus, Address::default(), &mut Delay).await.unwrap();
     configure_mpu(&mut mpu).await;
     unwrap!(spawner.spawn(sensor_processing(mpu, finger_flexes, tx_ch)));
 }

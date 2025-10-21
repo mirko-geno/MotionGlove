@@ -1,9 +1,9 @@
 # MAPE - MotionGlove
-Un guante periférico inalámbrico capaz de controlar una computadora, reemplazando el uso del mouse mediante un Raspberry Pi Pico W y un MPU6050
+Un guante periférico inalámbrico capaz de controlar una computadora, reemplazando el uso del mouse mediante un Raspberry Pi Pico W y un MPU9250
 
 #### Componentes
 - 2 Raspberry Pi Pico W
-- MPU6050
+- MPU9250
 - Bateria de litio
 - Sensores flex
 

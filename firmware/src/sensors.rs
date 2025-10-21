@@ -8,10 +8,10 @@ use embassy_sync::{
     channel::Sender,
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
-use mpu6050_dmp::{
-    sensor_async::Mpu6050,
+use mpu9250_async::{
+    sensor_async::Mpu9250,
     calibration::CalibrationParameters,
-    gyro::Gyro, accel::Accel
+    gyro::Gyro, accel::Accel, magnetometer::Mag
 };
 use usbd_hid::descriptor::{
     MouseReport,
@@ -21,11 +21,11 @@ use usbd_hid::descriptor::{
 use libm::{cos, sin, round};
 use crate::{FingerFlexes, FingerReadings, HidInstruction, THUMB, INDEX, MIDDLE, CHANNEL_SIZE, READ_FREQ};
 
-async fn calibrate_mpu(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
+async fn calibrate_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     let calibration_params = CalibrationParameters::new(
-        mpu6050_dmp::accel::AccelFullScale::G4,
-        mpu6050_dmp::gyro::GyroFullScale::Deg2000,
-        mpu6050_dmp::calibration::ReferenceGravity::Zero,
+        mpu9250_async::accel::AccelFullScale::G4,
+        mpu9250_async::gyro::GyroFullScale::Deg2000,
+        mpu9250_async::calibration::ReferenceGravity::Zero,
     );
 
     log::info!("Calibrating Sensor");
@@ -33,24 +33,24 @@ async fn calibrate_mpu(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
     log::info!("Sensor Calibrated");
 }
 
-pub async fn configure_mpu(mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>) {
+pub async fn configure_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     // Initialize DMP
     log::info!("Initializing DMP");
-    mpu.initialize_dmp(&mut Delay).await.unwrap();
+    // mpu.initialize_dmp(&mut Delay).await.unwrap();
 
     // Calibrate mpu
-    calibrate_mpu(mpu).await;
+    // calibrate_mpu(mpu).await;
 }
 
 async fn read_sensors(
-    mpu: &mut Mpu6050<I2c<'static, I2C0, i2c::Async>>,
+    mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>,
     finger_flexes: &mut FingerFlexes<'static>,
 ) -> (Accel, Gyro, FingerReadings) {
     // Tries to get accel and gyro data from motion6, in case of error returns zeros
-    let (accel, gyro) = match mpu.motion6().await {
+    let (accel, gyro, mag) = match mpu.motion9().await {
         Err(e) => {
             log::warn!("Error {:?} while reading mpu", {e});
-            (Accel::new(0,0,0), Gyro::new(0,0,0))
+            (Accel::new(0,0,0), Gyro::new(0,0,0), Mag::new(0, 0, 0))
         }
         Ok(readings) => {
             readings
@@ -67,13 +67,14 @@ async fn read_sensors(
     log::info!("Thumb: {}\nIndex: {}\nMiddle: {}\n", flexes[THUMB], flexes[INDEX], flexes[MIDDLE]);
     log::info!("Accelerometer [mg]: x={}, y={}, z={}", accel.x(), accel.y(), accel.z());
     log::info!("Gyroscope [deg/s]: x={}, y={}, z={}", gyro.x(), gyro.y(), gyro.z());
+    log::info!("Magnetometer [algo]: x={}, y={}, z={}", mag.x(), mag.y(), mag.z());
     // tx_ch.send(readings.as_bytes()).await;
     (accel, gyro, flexes)
 }
 
 #[embassy_executor::task]
 pub async fn sensor_processing(
-    mut mpu: Mpu6050<I2c<'static, I2C0, i2c::Async>>,
+    mut mpu: Mpu9250<I2c<'static, I2C0, i2c::Async>>,
     mut finger_flexes: FingerFlexes<'static>,
     tx_ch: Sender<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
@@ -99,10 +100,10 @@ pub async fn sensor_processing(
             modifier: 0,
             reserved: 0,
             leds: 0,
-            keycodes: [KeyboardUsage::KeyboardAa as u8, 0, 0, 0, 0, 0]
+            keycodes: [0, 0, 0, 0, 0, 0]
         };
         let media_report = MediaKeyboardReport {
-            usage_id: MediaKey::PlayPause.into() // Pause / Play button
+            usage_id: MediaKey::Zero.into() // Pause / Play button
         };
 
         let hid_report = HidInstruction {

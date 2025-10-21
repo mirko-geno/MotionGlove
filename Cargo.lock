@@ -1036,7 +1036,7 @@ dependencies = [
  "heapless",
  "libm",
  "log",
- "mpu6050-dmp",
+ "mpu9250-async",
  "panic-probe",
  "portable-atomic",
  "static_cell",
@@ -1592,9 +1592,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "mpu6050-dmp"
-version = "0.6.1"
-source = "git+https://github.com/barafael/mpu6050-dmp-rs.git#e98ff37dae475745bed83773047d073ad0ef7fc6"
+name = "mpu9250-async"
+version = "0.0.1"
+source = "git+https://github.com/mirko-geno/mpu9250-async-rs.git#414d040c3620f89a1abe51378c7d69087c3793c4#414d040c3620f89a1abe51378c7d69087c3793c4"
 dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",

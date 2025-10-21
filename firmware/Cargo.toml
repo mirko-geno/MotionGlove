@@ -33,5 +33,5 @@ heapless            = "0.8.0"
 usbd-hid            = "0.8.1"
 libm                = "0.2.15"
 
-mpu6050-dmp         = { git = "https://github.com/barafael/mpu6050-dmp-rs.git", features = ["async"]}
+mpu9250-async         = { git = "https://github.com/mirko-geno/mpu9250-async-rs.git", features = ["async"]}
 
