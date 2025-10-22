@@ -1594,7 +1594,7 @@ dependencies = [
 [[package]]
 name = "mpu9250-async"
 version = "0.0.1"
-source = "git+https://github.com/mirko-geno/mpu9250-async-rs.git#414d040c3620f89a1abe51378c7d69087c3793c4#414d040c3620f89a1abe51378c7d69087c3793c4"
+source = "git+https://github.com/mirko-geno/mpu9250-async-rs.git?rev=f6db572#f6db572c5a93d3e71c2fef95ad7300dbcd913f68"
 dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",
