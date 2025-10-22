@@ -78,12 +78,30 @@ pub async fn sensor_processing(
     mut finger_flexes: FingerFlexes<'static>,
     tx_ch: Sender<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
+    // Schmitt Trigger bands
+    const SUP_BAND: u16 = 900;
+    const LOW_BAND: u16 = 500;
+    const OPENED: bool = false;
+    const CLOSED: bool = true;
+    // Current flexes states
+    let mut finger_states: [bool; 3] = [OPENED; 3];
     let mut pitch = 0.0;
     loop {
         // Read sensor data
-        let (_accel, gyro, _flexes) = read_sensors(&mut mpu, &mut finger_flexes).await;
+        let (_accel, gyro, flexes) = read_sensors(&mut mpu, &mut finger_flexes).await;
 
-        // Process sensors
+        // Schmitt Trigger implemented for fingers
+        for (idx, flex) in flexes.iter().enumerate() {
+            finger_states[idx] = 
+                if flex >= &SUP_BAND { OPENED }
+                else if flex <= &LOW_BAND { CLOSED }
+                else { finger_states[idx] };
+        }
+
+        log::info!("Thumb [bool]: {}\nIndex [bool]: {}\nMiddle [bool]: {}\n",
+        finger_states[THUMB], finger_states[INDEX], finger_states[MIDDLE]);
+
+        // Process mpu
         let pitch_dot = (gyro.y() as f64) * cos(pitch) - (gyro.z() as f64) * sin(pitch);
         pitch = pitch + pitch_dot / READ_FREQ as f64;
         log::info!("pitch = {:?}", &pitch);
