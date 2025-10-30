@@ -1,3 +1,5 @@
+use core::f32::consts::PI;
+
 use {defmt_rtt as _, panic_probe as _};
 use embassy_time::{Delay, Duration, Timer};
 use embassy_rp::{
@@ -18,7 +20,7 @@ use usbd_hid::descriptor::{
     KeyboardReport, KeyboardUsage,
     MediaKeyboardReport, MediaKey,
 };
-use libm::{cos, sin, round};
+use libm::{atan2f, powf, sqrtf, roundf};
 use crate::{FingerFlexes, FingerReadings, HidInstruction, THUMB, INDEX, MIDDLE, CHANNEL_SIZE, READ_FREQ};
 
 async fn calibrate_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
@@ -85,10 +87,20 @@ pub async fn sensor_processing(
     const CLOSED: bool = true;
     // Current flexes states
     let mut finger_states: [bool; 3] = [OPENED; 3];
-    let mut pitch = 0.0;
+
+    // MPU calculation constants:
+    const PX_SENS: f32 = 10.0;         // Pixel movement per rotation angle
+    const ALPHA_ACC: f32 = 0.05;    // Relative weight of the accelerometer compared to the gyroscope
+    const DEAD_ZONE: f32 = 5.0;
+    const DELTA_TIME: f32 = 1.0 / READ_FREQ as f32;
+    // MPU variants:
+    let mut pitch: f32;
+    let mut roll: f32;
+    let mut angle_x: f32 = 0.0;
+    let mut angle_y: f32 = 0.0;
     loop {
         // Read sensor data
-        let (_accel, gyro, flexes) = read_sensors(&mut mpu, &mut finger_flexes).await;
+        let (accel, gyro, flexes) = read_sensors(&mut mpu, &mut finger_flexes).await;
 
         // Schmitt Trigger implemented for fingers
         for (idx, flex) in flexes.iter().enumerate() {
@@ -102,15 +114,33 @@ pub async fn sensor_processing(
         finger_states[THUMB], finger_states[INDEX], finger_states[MIDDLE]);
 
         // Process mpu
-        let pitch_dot = (gyro.y() as f64) * cos(pitch) - (gyro.z() as f64) * sin(pitch);
-        pitch = pitch + pitch_dot / READ_FREQ as f64;
-        log::info!("pitch = {:?}", &pitch);
+        roll = atan2f(
+            accel.y().into(),
+            accel.z().into()) * 180.0 / PI;
+
+        pitch = atan2f(
+            (-1*accel.x()).into(),
+            sqrtf(( accel.y() as i32 * accel.y() as i32 + accel.z() as i32 * accel.z() as i32 ) as f32 )) * 180.0 / PI;
+
+        angle_x = (1.0 - ALPHA_ACC) * (angle_x + gyro.x() as f32 *DELTA_TIME) + ALPHA_ACC * roll;
+        angle_y = (1.0 - ALPHA_ACC) * (angle_y + gyro.y() as f32 *DELTA_TIME) + ALPHA_ACC * pitch;
+
+        let mut vel_x: f32 = 0.0;
+        let mut vel_y: f32 = 0.0;
+        if angle_x.abs() > DEAD_ZONE {
+            vel_x = angle_x.signum() * PX_SENS * powf(angle_x.abs() - DEAD_ZONE, 1.2);            
+        }
+        if angle_y.abs() > DEAD_ZONE {
+            vel_y = angle_y.signum() * PX_SENS * powf(angle_y.abs() - DEAD_ZONE, 1.2);            
+        }
+
+        log::info!("vel_x: {vel_x}, pitch: {pitch}");
 
         // Make Hid reports from sensor processing
         let mouse_report = MouseReport {
             buttons: 0,
-            x: 0,
-            y: round(pitch) as i8,
+            x: roundf(vel_y * DELTA_TIME) as i8,
+            y: roundf(vel_x * DELTA_TIME) as i8,
             wheel: 0,
             pan: 0,
         };
@@ -135,5 +165,4 @@ pub async fn sensor_processing(
         // Limit working frequency
         Timer::after(Duration::from_hz(READ_FREQ)).await;
     }
-
 }
