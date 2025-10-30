@@ -13,8 +13,8 @@ pub mod sensors;
 pub mod blinker;
 pub mod tcp_client;
 
-pub const WIFI_NETWORK: &str = "MotionGloveConnection";
-pub const WIFI_PASSWORD: &str = "MGlove2025";
+pub const WIFI_NETWORK: &str = "MirkoWifi";
+pub const WIFI_PASSWORD: &str = "password123";
 pub const TCP_CHANNEL: u8 = 5;
 pub const TCP_ENDPOINT: u16 = 50124;
 pub const SOCKET_TIMEOUT: Duration = Duration::from_secs(15);
@@ -22,6 +22,9 @@ pub const DONGLE_IP: &str = "169.254.1.1";
 pub const SENDER_IP: &str = "169.254.1.2";
 pub const CHANNEL_SIZE: usize = 1;
 pub const READ_FREQ: u64 = 1000;
+pub const DELTA_TIME: f32 = 1.0 / READ_FREQ as f32;
+pub const PX_SENS: f32 = 30.0; // Pixel movement per rotation angle
+pub const DEAD_ZONE: f32 = 2.5;
 pub const THUMB: usize = 0;
 pub const INDEX: usize = 1;
 pub const MIDDLE: usize = 2;

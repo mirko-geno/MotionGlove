@@ -21,7 +21,7 @@ use usbd_hid::descriptor::{
     MediaKeyboardReport, MediaKey,
 };
 use libm::{atan2f, powf, sqrtf, roundf};
-use crate::{FingerFlexes, FingerReadings, HidInstruction, THUMB, INDEX, MIDDLE, CHANNEL_SIZE, READ_FREQ};
+use crate::{FingerFlexes, FingerReadings, HidInstruction, THUMB, INDEX, MIDDLE, CHANNEL_SIZE, READ_FREQ, DELTA_TIME, DEAD_ZONE, PX_SENS};
 
 async fn calibrate_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     let calibration_params = CalibrationParameters::new(
@@ -89,10 +89,7 @@ pub async fn sensor_processing(
     let mut finger_states: [bool; 3] = [OPENED; 3];
 
     // MPU calculation constants:
-    const PX_SENS: f32 = 10.0;         // Pixel movement per rotation angle
     const ALPHA_ACC: f32 = 0.05;    // Relative weight of the accelerometer compared to the gyroscope
-    const DEAD_ZONE: f32 = 5.0;
-    const DELTA_TIME: f32 = 1.0 / READ_FREQ as f32;
     // MPU variants:
     let mut pitch: f32;
     let mut roll: f32;
@@ -139,8 +136,8 @@ pub async fn sensor_processing(
         // Make Hid reports from sensor processing
         let mouse_report = MouseReport {
             buttons: 0,
-            x: roundf(vel_y * DELTA_TIME) as i8,
-            y: roundf(vel_x * DELTA_TIME) as i8,
+            x: roundf(vel_x * DELTA_TIME) as i8,
+            y: roundf(vel_y * DELTA_TIME) as i8,
             wheel: 0,
             pan: 0,
         };
