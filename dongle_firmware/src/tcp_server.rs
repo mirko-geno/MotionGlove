@@ -12,6 +12,7 @@ use embassy_sync::{
     channel::Sender,
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
+use cyw43::JoinOptions;
 use static_cell::StaticCell;
 use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, SOCKET_TIMEOUT, DONGLE_IP, HidInstruction, CHANNEL_SIZE};
 
@@ -39,8 +40,31 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 pub async fn tcp_server_task(
     mut control: cyw43::Control<'static>, stack: Stack<'static>, tx_ch: Sender<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
+    /* Create access point instead of connecting to WIFI in this way:
     //control.start_ap_open("cyw43", 5).await;
     control.start_ap_wpa2(WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL).await;
+
+    // And now we can use it!
+    log::info!("Stack is up!");
+
+    let mut rx_buffer = [0; 4096];
+    let mut tx_buffer = [0; 4096];
+    let mut buf = [0; 4096];
+    */
+
+    // Try connection wifi
+    while let Err(err) = control
+        .join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))
+        .await
+    {
+        log::info!("join failed with status={}", err.status);
+    }
+
+    log::info!("waiting for link...");
+    stack.wait_link_up().await;
+
+    log::info!("waiting for DHCP...");
+    stack.wait_config_up().await;
 
     // And now we can use it!
     log::info!("Stack is up!");
