@@ -4,5 +4,4 @@ members = [
   "glove",
   "dongle",
   "shared",
-  "programs/*"
 ]
