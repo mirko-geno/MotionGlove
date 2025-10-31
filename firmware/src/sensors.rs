@@ -21,7 +21,10 @@ use usbd_hid::descriptor::{
     MediaKeyboardReport, MediaKey,
 };
 use libm::{atan2f, powf, sqrtf, roundf};
-use crate::{FingerFlexes, FingerReadings, HidInstruction, THUMB, INDEX, MIDDLE, CHANNEL_SIZE, READ_FREQ, DELTA_TIME, DEAD_ZONE, PX_SENS};
+use crate::{
+    FingerFlexes, FingerReadings, THUMB, INDEX, MIDDLE,
+    CHANNEL_SIZE, READ_FREQ, HidInstruction,
+    DELTA_TIME, DEAD_ZONE, ROLL_SENS, PITCH_SENS};
 
 async fn calibrate_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     let calibration_params = CalibrationParameters::new(
@@ -125,13 +128,13 @@ pub async fn sensor_processing(
         let mut vel_x: f32 = 0.0;
         let mut vel_y: f32 = 0.0;
         if angle_x.abs() > DEAD_ZONE {
-            vel_x = angle_x.signum() * PX_SENS * powf(angle_x.abs() - DEAD_ZONE, 1.2);            
+            vel_x = angle_x.signum() * ROLL_SENS * powf(angle_x.abs() - DEAD_ZONE, 1.2);            
         }
         if angle_y.abs() > DEAD_ZONE {
-            vel_y = angle_y.signum() * PX_SENS * powf(angle_y.abs() - DEAD_ZONE, 1.2);            
+            vel_y = angle_y.signum() * PITCH_SENS * powf(angle_y.abs() - DEAD_ZONE, 1.2);            
         }
 
-        log::info!("vel_x: {vel_x}, pitch: {pitch}");
+        log::info!("mouse_x: {}, mouse_y: {}", vel_x * DELTA_TIME, vel_y * DELTA_TIME);
 
         // Make Hid reports from sensor processing
         let mouse_report = MouseReport {
