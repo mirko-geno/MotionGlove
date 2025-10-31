@@ -21,12 +21,15 @@ use embassy_sync::{
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-use dongle_firmware::{
+use shared::{
+    definitions::CHANNEL_SIZE,
+    custom_hid::HidInstruction
+};
+
+use dongle::{
     tcp_server::{network_config, tcp_server_task,},
     hid::{config_usb, hid_usb_controller}
 };
-
-use firmware::{HidInstruction, CHANNEL_SIZE};
 
 
 bind_interrupts!(struct Irqs {
@@ -69,8 +72,8 @@ async fn main(spawner: Spawner) {
     log::info!("USB Logger set up");
 
     // cyw43 wifi chip init
-    let fw = include_bytes!("../../firmware/cyw43-firmware/43439A0.bin");
-    let clm = include_bytes!("../../firmware/cyw43-firmware/43439A0_clm.bin");
+    let fw = include_bytes!("../../shared/cyw43-firmware/43439A0.bin");
+    let clm = include_bytes!("../../shared/cyw43-firmware/43439A0_clm.bin");
 
     let pwr = Output::new(p.PIN_23, Level::Low);
     let cs = Output::new(p.PIN_25, Level::High);

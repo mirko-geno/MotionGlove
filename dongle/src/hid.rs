@@ -18,8 +18,13 @@ use usbd_hid::descriptor::{MouseReport, KeyboardReport, MediaKeyboardReport, Med
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-use firmware::{CHANNEL_SIZE, HidInstruction};
-
+use shared::{
+    definitions::{
+        CHANNEL_SIZE,
+        MOUSE_POLL_MS
+    },
+    custom_hid::HidInstruction
+};
 
 // USB Descriptors
 static CONFIG_DESCRIPTOR: StaticCell<[u8; 256]> = StaticCell::new();
@@ -66,7 +71,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let mouse_config = HidConfig {
         report_descriptor: MouseReport::desc(),
         request_handler: None,
-        poll_ms: 1,
+        poll_ms: MOUSE_POLL_MS,
         max_packet_size: 64,
     };
     let hid_mouse = HidReaderWriter::<_, 1, 8>::new(&mut builder, mouse_state, mouse_config);
@@ -77,7 +82,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let keyboard_config = HidConfig {
         report_descriptor: KeyboardReport::desc(),
         request_handler: None,
-        poll_ms: 1,
+        poll_ms: MOUSE_POLL_MS,
         max_packet_size: 64,
     };
     let hid_keyboard = HidReaderWriter::<_, 1, 8>::new(&mut builder, keyboard_state, keyboard_config);
@@ -88,7 +93,7 @@ pub fn config_usb(driver: Driver<'static, USB>) -> (UsbDevice<'static, Driver<'s
     let media_config = HidConfig {
         report_descriptor: MediaKeyboardReport::desc(),
         request_handler: None,
-        poll_ms: 1,
+        poll_ms: MOUSE_POLL_MS,
         max_packet_size: 64,
     };
     let hid_media = HidReaderWriter::<_, 1, 8>::new(&mut builder, media_state, media_config);

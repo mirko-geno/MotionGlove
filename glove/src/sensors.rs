@@ -21,10 +21,22 @@ use usbd_hid::descriptor::{
     MediaKeyboardReport, MediaKey,
 };
 use libm::{atan2f, powf, sqrtf, roundf};
-use crate::{
-    FingerFlexes, FingerReadings, THUMB, INDEX, MIDDLE,
-    CHANNEL_SIZE, READ_FREQ, HidInstruction,
-    DELTA_TIME, DEAD_ZONE, ROLL_SENS, PITCH_SENS};
+
+use shared::{
+    definitions::{
+        READ_FREQ, DELTA_TIME,
+        CHANNEL_SIZE,
+        DEAD_ZONE,
+        ROLL_SENS, PITCH_SENS
+    },
+    custom_hid::HidInstruction,
+};
+
+use crate::flexes::{
+    FingerFlexes,FingerReadings,
+    THUMB, INDEX, MIDDLE,
+};
+
 
 async fn calibrate_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     let calibration_params = CalibrationParameters::new(

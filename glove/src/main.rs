@@ -24,10 +24,18 @@ use static_cell::StaticCell;
 
 use mpu9250_async::{address::Address, sensor_async::Mpu9250};
 
-use firmware::{
-    // blinker::blink_task,
-    CHANNEL_SIZE, HidInstruction, FingerFlexes, sensors::{configure_mpu, sensor_processing}, tcp_client::{network_config, tcp_client_task}
+use shared::{
+    definitions::CHANNEL_SIZE,
+    custom_hid::HidInstruction,
 };
+
+use glove::{
+    // blinker::blink_task,
+    sensors::{configure_mpu, sensor_processing},
+    flexes::FingerFlexes,
+    tcp_client::{network_config, tcp_client_task},
+};
+
 
 bind_interrupts!(
     struct Irqs {
@@ -78,8 +86,8 @@ async fn main(spawner: Spawner) {
     unwrap!(spawner.spawn(logger_task(driver)));
     
     // cyw43 wifi chip init
-    let fw = include_bytes!("../cyw43-firmware/43439A0.bin");
-    let clm = include_bytes!("../cyw43-firmware/43439A0_clm.bin");
+    let fw = include_bytes!("../../shared/cyw43-firmware/43439A0.bin");
+    let clm = include_bytes!("../../shared/cyw43-firmware/43439A0_clm.bin");
     
     static STATE: StaticCell<cyw43::State> = StaticCell::new();
     let state = STATE.init(cyw43::State::new());

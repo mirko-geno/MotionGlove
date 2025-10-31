@@ -616,7 +616,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dongle_firmware"
+name = "dongle"
 version = "0.1.0"
 dependencies = [
  "cortex-m",
@@ -635,11 +635,11 @@ dependencies = [
  "embassy-usb",
  "embassy-usb-logger",
  "embedded-io-async",
- "firmware",
  "heapless",
  "log",
  "panic-probe",
  "portable-atomic",
+ "shared",
  "static_cell",
  "usbd-hid",
 ]
@@ -1016,34 +1016,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ced73b1dacfc750a6db6c0a0c3a3853c8b41997e2e2c563dc90804ae6867959"
 
 [[package]]
-name = "firmware"
-version = "0.1.0"
-dependencies = [
- "cortex-m",
- "cortex-m-rt",
- "critical-section",
- "cyw43",
- "cyw43-pio",
- "defmt 1.0.1",
- "defmt-rtt",
- "embassy-executor",
- "embassy-net",
- "embassy-rp",
- "embassy-sync",
- "embassy-time",
- "embassy-usb-logger",
- "embedded-io-async",
- "heapless",
- "libm",
- "log",
- "mpu9250-async",
- "panic-probe",
- "portable-atomic",
- "static_cell",
- "usbd-hid",
-]
-
-[[package]]
 name = "fixed"
 version = "1.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,6 +1178,35 @@ dependencies = [
  "khronos_api",
  "log",
  "xml-rs",
+]
+
+[[package]]
+name = "glove"
+version = "0.1.0"
+dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
+ "critical-section",
+ "cyw43",
+ "cyw43-pio",
+ "defmt 1.0.1",
+ "defmt-rtt",
+ "embassy-executor",
+ "embassy-net",
+ "embassy-rp",
+ "embassy-sync",
+ "embassy-time",
+ "embassy-usb-logger",
+ "embedded-io-async",
+ "heapless",
+ "libm",
+ "log",
+ "mpu9250-async",
+ "panic-probe",
+ "portable-atomic",
+ "shared",
+ "static_cell",
+ "usbd-hid",
 ]
 
 [[package]]
@@ -2294,6 +2295,14 @@ checksum = "75872d278a8f37ef87fa0ddbda7802605cb18344497949862c0d4dcb291eba60"
 dependencies = [
  "digest",
  "keccak",
+]
+
+[[package]]
+name = "shared"
+version = "0.1.0"
+dependencies = [
+ "embassy-time",
+ "usbd-hid",
 ]
 
 [[package]]

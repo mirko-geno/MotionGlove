@@ -16,13 +16,23 @@ use embassy_sync::{
 use embassy_time::{Timer, Duration, with_timeout};
 use embedded_io_async::Write;
 use static_cell::StaticCell;
-use crate::{WIFI_NETWORK, WIFI_PASSWORD, DONGLE_IP, SENDER_IP, TCP_ENDPOINT, SOCKET_TIMEOUT, HidInstruction, CHANNEL_SIZE};
+
+use shared::{
+    definitions::{
+        WIFI_NETWORK, WIFI_PASSWORD,
+        DONGLE_IP, GLOVE_IP,
+        TCP_ENDPOINT,
+        SOCKET_TIMEOUT,
+        CHANNEL_SIZE,
+    },
+    custom_hid::HidInstruction
+};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {
     // Configure the network
     let config = Config::ipv4_static(embassy_net::StaticConfigV4 {
-        address: embassy_net::Ipv4Cidr::new(embassy_net::Ipv4Address::from_str(SENDER_IP).unwrap(), 16),
+        address: embassy_net::Ipv4Cidr::new(embassy_net::Ipv4Address::from_str(GLOVE_IP).unwrap(), 16),
         dns_servers: heapless::Vec::new(),
         gateway: None,
     });

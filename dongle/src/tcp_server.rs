@@ -14,7 +14,18 @@ use embassy_sync::{
 };
 use cyw43::JoinOptions;
 use static_cell::StaticCell;
-use firmware::{WIFI_NETWORK, WIFI_PASSWORD, TCP_CHANNEL, TCP_ENDPOINT, SOCKET_TIMEOUT, DONGLE_IP, HidInstruction, CHANNEL_SIZE};
+
+use shared::{
+    definitions::{
+        WIFI_NETWORK, WIFI_PASSWORD,
+        DONGLE_IP,
+        // TCP_CHANNEL,
+        TCP_ENDPOINT,
+        SOCKET_TIMEOUT,
+        CHANNEL_SIZE
+    },
+    custom_hid::HidInstruction
+};
 
 
 pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::Stack<'static>, embassy_net::Runner<'static, cyw43::NetDriver<'static>>) {

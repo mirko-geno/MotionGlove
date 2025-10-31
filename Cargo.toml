@@ -1,7 +1,8 @@
 [workspace]
 resolver = "3" # To use 2024 Rust version
-members = [ 
-  "dongle_firmware",
-  "firmware",
+members = [
+  "glove",
+  "dongle",
+  "shared",
   "programs/*"
 ]

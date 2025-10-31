@@ -15,7 +15,7 @@ Un guante periférico inalámbrico capaz de controlar una computadora, reemplaza
 ```
 2. Asegurarse que el micro esté en modo bootloader
 
-3. Compilar y ejecutar los binarios acorde a cada dispositivo (Guante -> firmware, Dongle -> dongle_firmware):
+3. Compilar y ejecutar los binarios acorde a cada dispositivo (Guante -> glove, Dongle -> dongle):
 ```bash
 cd firmware
 cargo run --release
