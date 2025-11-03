@@ -31,7 +31,7 @@ use shared::{
         READ_FREQ, DELTA_TIME,
         CHANNEL_SIZE,
         DEAD_ZONE,
-        ROLL_SENS, PITCH_SENS
+        ROLL_SENS, PITCH_SENS, WHEEL_SENS, PAN_SENS,
     },
     custom_hid::HidInstruction,
 };
@@ -86,12 +86,12 @@ fn get_hid_report(vel_x: f32, vel_y: f32, finger_states: &[bool; 3], tap: bool) 
             buttons: 0,
             x: 0,
             y: 0,
-            wheel: roundf(vel_y) as i8,
-            pan: roundf(vel_x) as i8
+            wheel: roundf(vel_y * WHEEL_SENS) as i8,
+            pan: roundf(vel_x * PAN_SENS) as i8
         }
     };
-    // if finger_states[INDEX] {mouse_report.buttons = LEFT_CLICK};
-    // if finger_states[MIDDLE] {mouse_report.buttons = RIGHT_CLICK};
+    if finger_states[INDEX] {mouse_report.buttons = LEFT_CLICK};
+    if finger_states[MIDDLE] {mouse_report.buttons = RIGHT_CLICK};
     
     let keyboard_report = KeyboardReport {
         modifier: 0,
