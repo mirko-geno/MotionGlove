@@ -1,9 +1,13 @@
 use core::f32::consts::PI;
 
 use {defmt_rtt as _, panic_probe as _};
-use embassy_time::{Delay, Duration, Timer};
+use embassy_time::{
+    Duration, Timer,
+    //Delay,
+};
 use embassy_rp::{
-    peripherals::I2C0, 
+    peripherals::I2C0,
+    gpio::Input,
     i2c::{self, I2c},
 };
 use embassy_sync::{
@@ -12,12 +16,12 @@ use embassy_sync::{
 };
 use mpu9250_async::{
     sensor_async::Mpu9250,
-    calibration::CalibrationParameters,
+    // calibration::CalibrationParameters,
     gyro::Gyro, accel::Accel, magnetometer::Mag
 };
 use usbd_hid::descriptor::{
     MouseReport,
-    KeyboardReport, KeyboardUsage,
+    KeyboardReport, // KeyboardUsage,
     MediaKeyboardReport, MediaKey,
 };
 use libm::{atan2f, powf, sqrtf, roundf};
@@ -37,7 +41,13 @@ use crate::flexes::{
     THUMB, INDEX, MIDDLE,
 };
 
+const OPENED: bool = false;
+const CLOSED: bool = true;
+const LEFT_CLICK: u8 = 1;
+const RIGHT_CLICK: u8 = 2;
 
+
+/*
 async fn calibrate_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     let calibration_params = CalibrationParameters::new(
         mpu9250_async::accel::AccelFullScale::G4,
@@ -49,7 +59,9 @@ async fn calibrate_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     mpu.calibrate(&mut Delay, &calibration_params).await.unwrap();
     log::info!("Sensor Calibrated");
 }
+*/
 
+/*
 pub async fn configure_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     // Initialize DMP
     log::info!("Initializing DMP");
@@ -58,11 +70,52 @@ pub async fn configure_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
     // Calibrate mpu
     // calibrate_mpu(mpu).await;
 }
+*/
+
+fn get_hid_report(vel_x: f32, vel_y: f32, finger_states: &[bool; 3], tap: bool) -> HidInstruction {
+    // Make Hid reports from sensor processing
+    let mut mouse_report = match tap {
+        false => MouseReport {
+            buttons: 0,
+            x: roundf(vel_x * ROLL_SENS) as i8,
+            y: roundf(vel_y * PITCH_SENS) as i8,
+            wheel: 0,
+            pan:0
+        },
+        true => MouseReport {
+            buttons: 0,
+            x: 0,
+            y: 0,
+            wheel: roundf(vel_y) as i8,
+            pan: roundf(vel_x) as i8
+        }
+    };
+    // if finger_states[INDEX] {mouse_report.buttons = LEFT_CLICK};
+    // if finger_states[MIDDLE] {mouse_report.buttons = RIGHT_CLICK};
+    
+    let keyboard_report = KeyboardReport {
+        modifier: 0,
+        reserved: 0,
+        leds: 0,
+        keycodes: [0, 0, 0, 0, 0, 0]
+    };
+    let media_report = MediaKeyboardReport {
+        usage_id: MediaKey::Zero.into() // Pause / Play button
+    };
+
+    HidInstruction {
+        mouse: mouse_report,
+        keyboard: keyboard_report,
+        media: media_report
+    }
+}
+
 
 async fn read_sensors(
     mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>,
     finger_flexes: &mut FingerFlexes<'static>,
-) -> (Accel, Gyro, FingerReadings) {
+    finger_tap: &mut Input<'static>
+) -> (Accel, Gyro, FingerReadings, bool) {
     // Tries to get accel and gyro data from motion6, in case of error returns zeros
     let (accel, gyro, mag) = match mpu.motion9().await {
         Err(e) => {
@@ -80,26 +133,28 @@ async fn read_sensors(
         }
         Ok(readings) => readings
     };
+    let tap = finger_tap.is_high();
     log::info!("Sensor Readings:");
     log::info!("Thumb: {}\nIndex: {}\nMiddle: {}\n", flexes[THUMB], flexes[INDEX], flexes[MIDDLE]);
+    log::info!("Thumb and Index are touching: {}", tap);
     log::info!("Accelerometer [mg]: x={}, y={}, z={}", accel.x(), accel.y(), accel.z());
     log::info!("Gyroscope [deg/s]: x={}, y={}, z={}", gyro.x(), gyro.y(), gyro.z());
     log::info!("Magnetometer [algo]: x={}, y={}, z={}", mag.x(), mag.y(), mag.z());
-    // tx_ch.send(readings.as_bytes()).await;
-    (accel, gyro, flexes)
+
+    (accel, gyro, flexes, tap)
 }
+
 
 #[embassy_executor::task]
 pub async fn sensor_processing(
     mut mpu: Mpu9250<I2c<'static, I2C0, i2c::Async>>,
     mut finger_flexes: FingerFlexes<'static>,
+    mut finger_tap: Input<'static>,
     tx_ch: Sender<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
     // Schmitt Trigger bands
     const SUP_BAND: u16 = 900;
     const LOW_BAND: u16 = 500;
-    const OPENED: bool = false;
-    const CLOSED: bool = true;
     // Current flexes states
     let mut finger_states: [bool; 3] = [OPENED; 3];
 
@@ -112,7 +167,7 @@ pub async fn sensor_processing(
     let mut angle_y: f32 = 0.0;
     loop {
         // Read sensor data
-        let (accel, gyro, flexes) = read_sensors(&mut mpu, &mut finger_flexes).await;
+        let (accel, gyro, flexes, tap) = read_sensors(&mut mpu, &mut finger_flexes, &mut finger_tap).await;
 
         // Schmitt Trigger implemented for fingers
         for (idx, flex) in flexes.iter().enumerate() {
@@ -134,44 +189,21 @@ pub async fn sensor_processing(
             (-1*accel.x()).into(),
             sqrtf(( accel.y() as i32 * accel.y() as i32 + accel.z() as i32 * accel.z() as i32 ) as f32 )) * 180.0 / PI;
 
-        angle_x = (1.0 - ALPHA_ACC) * (angle_x + gyro.x() as f32 *DELTA_TIME) + ALPHA_ACC * roll;
-        angle_y = (1.0 - ALPHA_ACC) * (angle_y + gyro.y() as f32 *DELTA_TIME) + ALPHA_ACC * pitch;
+        angle_x = (1.0 - ALPHA_ACC) * (angle_x + gyro.x() as f32 * DELTA_TIME) + ALPHA_ACC * roll;
+        angle_y = (1.0 - ALPHA_ACC) * (angle_y + gyro.y() as f32 * DELTA_TIME) + ALPHA_ACC * pitch;
 
-        let mut vel_x: f32 = 0.0;
-        let mut vel_y: f32 = 0.0;
-        if angle_x.abs() > DEAD_ZONE {
-            vel_x = angle_x.signum() * ROLL_SENS * powf(angle_x.abs() - DEAD_ZONE, 1.2);            
-        }
-        if angle_y.abs() > DEAD_ZONE {
-            vel_y = angle_y.signum() * PITCH_SENS * powf(angle_y.abs() - DEAD_ZONE, 1.2);            
-        }
-
-        log::info!("mouse_x: {}, mouse_y: {}", vel_x * DELTA_TIME, vel_y * DELTA_TIME);
-
-        // Make Hid reports from sensor processing
-        let mouse_report = MouseReport {
-            buttons: 0,
-            x: roundf(vel_x * DELTA_TIME) as i8,
-            y: roundf(vel_y * DELTA_TIME) as i8,
-            wheel: 0,
-            pan: 0,
+        let vel_x = match angle_x.abs() > DEAD_ZONE {
+            false => 0.0,
+            true => angle_x.signum() * DELTA_TIME * powf(angle_x.abs() - DEAD_ZONE, 1.2)
         };
-        let keyboard_report = KeyboardReport {
-            modifier: 0,
-            reserved: 0,
-            leds: 0,
-            keycodes: [0, 0, 0, 0, 0, 0]
+        let vel_y = match angle_y.abs() > DEAD_ZONE {
+            false => 0.0,
+            true => angle_y.signum() * DELTA_TIME * powf(angle_y.abs() - DEAD_ZONE, 1.2)
         };
-        let media_report = MediaKeyboardReport {
-            usage_id: MediaKey::Zero.into() // Pause / Play button
-        };
+        log::info!("vel_x: {}, vel_y: {}", vel_x, vel_y);
 
-        let hid_report = HidInstruction {
-            mouse: mouse_report,
-            keyboard: keyboard_report,
-            media: media_report
-        };
-
+        // Get hid combination from sensors and send it to tcp client
+        let hid_report = get_hid_report(vel_x, vel_y, &finger_states, tap);
         tx_ch.send(hid_report).await;
 
         // Limit working frequency

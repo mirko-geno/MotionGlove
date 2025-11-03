@@ -7,7 +7,7 @@ use {defmt_rtt as _, panic_probe as _};
 use embassy_executor::Spawner;
 use embassy_rp::{
     bind_interrupts,
-    gpio::{Level, Output, Pull},
+    gpio::{Input, Output, Pull, Level},
     peripherals::{DMA_CH0, PIO0, I2C0, USB},
     pio::{self, Pio}, 
     i2c::{self, I2c},
@@ -31,7 +31,7 @@ use shared::{
 
 use glove::{
     // blinker::blink_task,
-    sensors::{configure_mpu, sensor_processing},
+    sensors::sensor_processing,
     flexes::FingerFlexes,
     tcp_client::{network_config, tcp_client_task},
 };
@@ -111,12 +111,16 @@ async fn main(spawner: Spawner) {
     unwrap!(spawner.spawn(tcp_client_task(control, stack, rx_ch)));
 
     // Instantiate ADC flex sensors
-    let adc_driver  = Adc::new(p.ADC, Irqs, AdcConfig::default());
-    let thumb_flex = adc::Channel::new_pin(p.PIN_28, Pull::Down);
-    let index_flex = adc::Channel::new_pin(p.PIN_27, Pull::Down);
-    let middle_flex  = adc::Channel::new_pin(p.PIN_26, Pull::Down);
+    let adc_driver   = Adc::new(p.ADC, Irqs, AdcConfig::default());
+    let thumb_flex      = adc::Channel::new_pin(p.PIN_28, Pull::Down);
+    let index_flex      = adc::Channel::new_pin(p.PIN_27, Pull::Down);
+    let middle_flex     = adc::Channel::new_pin(p.PIN_26, Pull::Down);
 
     let finger_flexes = FingerFlexes::new(adc_driver, thumb_flex, index_flex, middle_flex);
+
+    // Instantiate Finger tap
+    let mut finger_tap = Input::new(p.PIN_22, Pull::Down);
+    finger_tap.set_schmitt(true);
 
     // Instantiate mpu sensor
     let sda = p.PIN_4; // GP20, PIN26
@@ -124,7 +128,6 @@ async fn main(spawner: Spawner) {
 
     let i2c_config = i2c::Config::default();
     let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);
-    let mut mpu = Mpu9250::new(i2c_bus, Address::default(), &mut Delay).await.unwrap();
-    configure_mpu(&mut mpu).await;
-    unwrap!(spawner.spawn(sensor_processing(mpu, finger_flexes, tx_ch)));
+    let mpu = Mpu9250::new(i2c_bus, Address::default(), &mut Delay).await.unwrap();
+    unwrap!(spawner.spawn(sensor_processing(mpu, finger_flexes, finger_tap, tx_ch)));
 }
