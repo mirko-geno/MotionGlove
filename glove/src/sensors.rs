@@ -2,7 +2,7 @@ use core::f32::consts::PI;
 
 use {defmt_rtt as _, panic_probe as _};
 use embassy_time::{
-    Duration, Timer,
+    Duration, Timer, Instant,
     //Delay,
 };
 use embassy_rp::{
@@ -28,7 +28,7 @@ use libm::{atan2f, powf, sqrtf, roundf};
 
 use shared::{
     definitions::{
-        READ_FREQ, DELTA_TIME,
+        READ_FREQ, DELTA_TIME, PADDING_FREQ,
         CHANNEL_SIZE,
         DEAD_ZONE,
         ROLL_SENS, PITCH_SENS, WHEEL_SENS, PAN_SENS,
@@ -72,22 +72,28 @@ pub async fn configure_mpu(mpu: &mut Mpu9250<I2c<'static, I2C0, i2c::Async>>) {
 }
 */
 
-fn get_hid_report(vel_x: f32, vel_y: f32, finger_states: &[bool; 3], tap: bool) -> HidInstruction {
+fn get_hid_report(
+    vel_x: f32, vel_y: f32,
+    finger_states: &[bool; 3],
+    tap: bool,
+    last_padding: &mut Instant
+) -> HidInstruction {
     // Make Hid reports from sensor processing
-    let mut mouse_report = match tap {
-        false => MouseReport {
-            buttons: 0,
-            x: roundf(vel_x * ROLL_SENS) as i8,
-            y: roundf(vel_y * PITCH_SENS) as i8,
-            wheel: 0,
-            pan:0
+    let mut mouse_report = MouseReport { buttons: 0, x:0, y:0, wheel: 0, pan: 0 };
+    match tap {
+        false => {
+            mouse_report.x = roundf(vel_x * ROLL_SENS) as i8;
+            mouse_report.y = roundf(vel_y * PITCH_SENS) as i8;
         },
-        true => MouseReport {
-            buttons: 0,
-            x: 0,
-            y: 0,
-            wheel: roundf(vel_y * WHEEL_SENS) as i8,
-            pan: roundf(vel_x * PAN_SENS) as i8
+        true => {
+            let refresh = Duration::from_hz(PADDING_FREQ);
+            if last_padding.elapsed() >= refresh {
+                mouse_report.wheel = (vel_y.signum() * WHEEL_SENS) as i8;
+                mouse_report.pan = (vel_x.signum() * PAN_SENS) as i8;
+
+                *last_padding = last_padding.saturating_add(refresh);
+            }
+            // Continue if not enough time elapsed
         }
     };
     if finger_states[INDEX] {mouse_report.buttons = LEFT_CLICK};
@@ -165,6 +171,9 @@ pub async fn sensor_processing(
     let mut roll: f32;
     let mut angle_x: f32 = 0.0;
     let mut angle_y: f32 = 0.0;
+
+    // Mouse padding delay:
+    let mut last_padding = Instant::now();
     loop {
         // Read sensor data
         let (accel, gyro, flexes, tap) = read_sensors(&mut mpu, &mut finger_flexes, &mut finger_tap).await;
@@ -203,7 +212,7 @@ pub async fn sensor_processing(
         log::info!("vel_x: {}, vel_y: {}", vel_x, vel_y);
 
         // Get hid combination from sensors and send it to tcp client
-        let hid_report = get_hid_report(vel_x, vel_y, &finger_states, tap);
+        let hid_report = get_hid_report(vel_x, vel_y, &finger_states, tap, &mut last_padding);
         tx_ch.send(hid_report).await;
 
         // Limit working frequency
