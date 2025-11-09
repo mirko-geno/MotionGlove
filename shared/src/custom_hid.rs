@@ -6,6 +6,7 @@ use usbd_hid::descriptor::{
 
 pub type HidInstructionArr = [u8; 16];
 
+#[derive(Debug)]
 pub struct HidInstruction {
     pub mouse: MouseReport,
     pub keyboard: KeyboardReport,

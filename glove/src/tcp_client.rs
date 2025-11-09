@@ -114,7 +114,7 @@ mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'st
                     log::warn!("Write error: {:?}", e);
                     break;
                 }
-                log::info!("sent: {:?}", (&tcp_message[..]));
+                log::info!("sent: {:?}", hid_instruction);
             }
         }
     }
