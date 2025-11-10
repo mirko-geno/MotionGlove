@@ -88,8 +88,8 @@ fn get_hid_report(
         true => {
             let refresh = Duration::from_hz(PADDING_FREQ);
             if last_padding.elapsed() >= refresh {
-                mouse_report.wheel = (vel_y.signum() * WHEEL_SENS) as i8;
-                mouse_report.pan = (vel_x.signum() * PAN_SENS) as i8;
+                mouse_report.wheel = roundf(-vel_y * WHEEL_SENS) as i8;
+                mouse_report.pan = roundf(vel_x * PAN_SENS) as i8;
 
                 *last_padding = last_padding.saturating_add(refresh);
             }
@@ -181,8 +181,8 @@ pub async fn sensor_processing(
         // Schmitt Trigger implemented for fingers
         for (idx, flex) in flexes.iter().enumerate() {
             finger_states[idx] = 
-                if flex >= &SUP_BAND { OPENED }
-                else if flex <= &LOW_BAND { CLOSED }
+                if *flex >= SUP_BAND { OPENED }
+                else if *flex <= LOW_BAND { CLOSED }
                 else { finger_states[idx] };
         }
 
