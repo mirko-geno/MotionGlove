@@ -1,8 +1,8 @@
 use embassy_rp::adc::{self, Adc, Error as AdcError};
 
-pub const THUMB: usize = 0;
-pub const INDEX: usize = 1;
-pub const MIDDLE: usize = 2;
+pub const INDEX: usize = 0;
+pub const MIDDLE: usize = 1;
+pub const RING: usize = 2;
 pub type FingerReadings = [u16; 3];
 
 pub struct FingerFlexes<'a> {

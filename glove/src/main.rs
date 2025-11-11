@@ -112,19 +112,19 @@ async fn main(spawner: Spawner) {
 
     // Instantiate ADC flex sensors
     let adc_driver   = Adc::new(p.ADC, Irqs, AdcConfig::default());
-    let thumb_flex      = adc::Channel::new_pin(p.PIN_28, Pull::Down);
-    let index_flex      = adc::Channel::new_pin(p.PIN_27, Pull::Down);
-    let middle_flex     = adc::Channel::new_pin(p.PIN_26, Pull::Down);
+    let index_flex      = adc::Channel::new_pin(p.PIN_26, Pull::Down);
+    let middle_flex     = adc::Channel::new_pin(p.PIN_27, Pull::Down);
+    let ring_flex       = adc::Channel::new_pin(p.PIN_28, Pull::Down);
 
-    let finger_flexes = FingerFlexes::new(adc_driver, thumb_flex, index_flex, middle_flex);
+    let finger_flexes = FingerFlexes::new(adc_driver, index_flex, middle_flex, ring_flex);
 
     // Instantiate Finger tap
-    let mut finger_tap = Input::new(p.PIN_22, Pull::Down);
+    let mut finger_tap = Input::new(p.PIN_16, Pull::Down);
     finger_tap.set_schmitt(true);
 
     // Instantiate mpu sensor
-    let sda = p.PIN_4; // GP20, PIN26
-    let scl = p.PIN_5; // GP21, PIN27
+    let sda = p.PIN_20; // GP20, PIN26
+    let scl = p.PIN_21; // GP21, PIN27
 
     let i2c_config = i2c::Config::default();
     let i2c_bus = I2c::new_async(p.I2C0, scl, sda, Irqs, i2c_config);

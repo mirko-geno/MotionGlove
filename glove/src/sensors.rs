@@ -38,7 +38,7 @@ use shared::{
 
 use crate::flexes::{
     FingerFlexes,FingerReadings,
-    THUMB, INDEX, MIDDLE,
+    INDEX, MIDDLE, RING
 };
 
 const OPENED: bool = false;
@@ -80,6 +80,9 @@ fn get_hid_report(
 ) -> HidInstruction {
     // Make Hid reports from sensor processing
     let mut mouse_report = MouseReport { buttons: 0, x:0, y:0, wheel: 0, pan: 0 };
+    let mut keyboard_report = KeyboardReport { modifier: 0, reserved: 0, leds: 0, keycodes: [0, 0, 0, 0, 0, 0] };
+    let media_report = MediaKeyboardReport { usage_id: MediaKey::Zero.into() };
+    
     match tap {
         false => {
             mouse_report.x = roundf(vel_x * ROLL_SENS) as i8;
@@ -98,16 +101,6 @@ fn get_hid_report(
     };
     if finger_states[INDEX] {mouse_report.buttons = LEFT_CLICK};
     if finger_states[MIDDLE] {mouse_report.buttons = RIGHT_CLICK};
-    
-    let keyboard_report = KeyboardReport {
-        modifier: 0,
-        reserved: 0,
-        leds: 0,
-        keycodes: [0, 0, 0, 0, 0, 0]
-    };
-    let media_report = MediaKeyboardReport {
-        usage_id: MediaKey::Zero.into() // Pause / Play button
-    };
 
     HidInstruction {
         mouse: mouse_report,
@@ -141,7 +134,7 @@ async fn read_sensors(
     };
     let tap = finger_tap.is_high();
     log::info!("Sensor Readings:");
-    log::info!("Thumb: {}\nIndex: {}\nMiddle: {}\n", flexes[THUMB], flexes[INDEX], flexes[MIDDLE]);
+    log::info!("Index: {}\nMiddle: {}\nRing: {}\n", flexes[INDEX], flexes[MIDDLE], flexes[RING]);
     log::info!("Thumb and Index are touching: {}", tap);
     log::info!("Accelerometer [mg]: x={}, y={}, z={}", accel.x(), accel.y(), accel.z());
     log::info!("Gyroscope [deg/s]: x={}, y={}, z={}", gyro.x(), gyro.y(), gyro.z());
@@ -160,7 +153,7 @@ pub async fn sensor_processing(
 ) -> ! {
     // Schmitt Trigger bands
     const SUP_BAND: u16 = 900;
-    const LOW_BAND: u16 = 500;
+    const LOW_BAND: u16 = 650;
     // Current flexes states
     let mut finger_states: [bool; 3] = [OPENED; 3];
 
@@ -186,8 +179,8 @@ pub async fn sensor_processing(
                 else { finger_states[idx] };
         }
 
-        log::info!("Thumb [bool]: {}\nIndex [bool]: {}\nMiddle [bool]: {}\n",
-        finger_states[THUMB], finger_states[INDEX], finger_states[MIDDLE]);
+        log::info!("Index [bool]: {}\nMiddle [bool]: {}\nThumb [bool]: {}\n",
+        finger_states[INDEX], finger_states[MIDDLE], finger_states[RING]);
 
         // Process mpu
         roll = atan2f(
