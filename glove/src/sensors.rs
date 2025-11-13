@@ -85,14 +85,14 @@ fn get_hid_report(
     
     match tap {
         false => {
-            mouse_report.x = roundf(vel_x * ROLL_SENS) as i8;
-            mouse_report.y = roundf(vel_y * PITCH_SENS) as i8;
+            mouse_report.x = roundf(-vel_y * ROLL_SENS) as i8;
+            mouse_report.y = roundf(vel_x * PITCH_SENS) as i8;
         },
         true => {
             let refresh = Duration::from_hz(PADDING_FREQ);
             if last_padding.elapsed() >= refresh {
-                mouse_report.wheel = roundf(-vel_y * WHEEL_SENS) as i8;
-                mouse_report.pan = roundf(vel_x * PAN_SENS) as i8;
+                mouse_report.wheel = roundf(vel_x * WHEEL_SENS) as i8;
+                mouse_report.pan = roundf(-vel_y * PAN_SENS) as i8;
 
                 *last_padding = last_padding.saturating_add(refresh);
             }
