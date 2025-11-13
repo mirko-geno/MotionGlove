@@ -110,12 +110,14 @@ pub async fn hid_usb_controller(mut hid_mouse: HidDevice, mut hid_keyboard: HidD
 rx_ch: Receiver<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>) -> ! {
     loop {
         let hid_instruction = rx_ch.receive().await;
+        /*
         let release_keyboard = KeyboardReport {
             modifier: 0,
             reserved: 0,
             leds: 0,
             keycodes: [0, 0, 0, 0, 0, 0], // None
         };
+        */
         let release_media = MediaKeyboardReport {
             usage_id: MediaKey::Zero.into()
         };
@@ -126,9 +128,11 @@ rx_ch: Receiver<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>)
         if let Err(e) = hid_keyboard.write_serialize(&hid_instruction.keyboard).await {
             log::warn!("Failed to send keyboard report: {:?}", e);
         }
+        /*
         if let Err(e) = hid_keyboard.write_serialize(&release_keyboard).await {
             log::warn!("Failed to release keyboard report: {:?}", e);
         }
+        */
         if let Err(e) = hid_media.write_serialize(&hid_instruction.media).await {
             log::warn!("Failed to send keyboard report: {:?}", e);
         }

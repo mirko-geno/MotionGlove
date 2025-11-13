@@ -21,7 +21,7 @@ use mpu9250_async::{
 };
 use usbd_hid::descriptor::{
     MouseReport,
-    KeyboardReport, // KeyboardUsage,
+    KeyboardReport, KeyboardUsage,
     MediaKeyboardReport, MediaKey,
 };
 use libm::{atan2f, powf, sqrtf, roundf};
@@ -101,6 +101,7 @@ fn get_hid_report(
     };
     if finger_states[INDEX] {mouse_report.buttons = LEFT_CLICK};
     if finger_states[MIDDLE] {mouse_report.buttons = RIGHT_CLICK};
+    if finger_states[RING] {keyboard_report.modifier = 0x01};  // Left control
 
     HidInstruction {
         mouse: mouse_report,
