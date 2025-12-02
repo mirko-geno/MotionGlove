@@ -30,6 +30,7 @@ use shared::{
     definitions::{
         READ_FREQ, DELTA_TIME, PADDING_FREQ,
         CHANNEL_SIZE,
+        SUP_BAND, LOW_BAND,
         DEAD_ZONE,
         ROLL_SENS, PITCH_SENS, WHEEL_SENS, PAN_SENS,
     },
@@ -152,9 +153,6 @@ pub async fn sensor_processing(
     mut finger_tap: Input<'static>,
     tx_ch: Sender<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
-    // Schmitt Trigger bands
-    const SUP_BAND: u16 = 900;
-    const LOW_BAND: u16 = 650;
     // Current flexes states
     let mut finger_states: [bool; 3] = [OPENED; 3];
 
