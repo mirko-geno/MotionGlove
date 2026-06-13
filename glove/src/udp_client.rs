@@ -6,15 +6,15 @@ use embassy_rp::clocks::RoscRng;
 use embassy_net::{
     Config,
     Stack,
-    tcp::TcpSocket,
+    udp::{UdpSocket, PacketMetadata},
     StackResources,
 };
 use embassy_sync::{
     channel::Receiver,
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
-use embassy_time::{Timer, Duration, with_timeout};
-use embedded_io_async::Write;
+use embassy_time::{Timer, Duration};
+// use embedded_io_async::Write;
 use static_cell::StaticCell;
 
 use shared::{
@@ -49,11 +49,15 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 
 
 #[embassy_executor::task]
-pub async fn tcp_client_task(
-mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
+pub async fn udp_client_task(
+    mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
+    let host_addr = embassy_net::Ipv4Address::from_str(DONGLE_IP).unwrap();
+    
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
+    let mut rx_meta = [PacketMetadata::EMPTY; 16];
+    let mut tx_meta = [PacketMetadata::EMPTY; 16];
     let mut hid_instruction: HidInstruction;
 
     // Try wifi connection
@@ -61,7 +65,7 @@ mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'st
         log::info!("Connecting to WiFi...");
         control.leave().await; // Drops any wifi association to avoid control.join(...) crashes
         // with_timeout to retry avoiding softlocks
-        match with_timeout(Duration::from_secs(5), 
+        match embassy_time::with_timeout(Duration::from_secs(5), 
         control.join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))).await {
             Err(_err) => {
                 log::info!("Wifi connection failed, connection timed out");
@@ -90,31 +94,49 @@ mut control: cyw43::Control<'static>, stack: Stack<'static>, rx_ch: Receiver<'st
         // Clean buffers
         rx_buffer.fill(0);
         tx_buffer.fill(0);
-
+        
+        
         loop {
-            let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-            socket.set_timeout(Some(SOCKET_TIMEOUT));
-
+            // socket.set_timeout(Some(SOCKET_TIMEOUT));
             control.gpio_set(0, false).await; // LED off
-            log::info!("Connecting to TCP...");
-            let host_addr = embassy_net::Ipv4Address::from_str(DONGLE_IP).unwrap();
-            if let Err(e) = socket.connect((host_addr, CONNECTION_ENDPOINT)).await {
-                log::warn!("TCP connection error: {:?}", e);
-                break;
+            
+            let mut socket = UdpSocket::new(
+                stack, &mut rx_meta, &mut rx_buffer, &mut tx_meta, &mut tx_buffer
+            );
+    
+            while let Err(e) = socket.bind(CONNECTION_ENDPOINT) {
+                log::warn!("Couldn't bind endpoint, error: {:?}", e);
+                Timer::after_millis(10).await;
+            };
+            
+            log::info!("Connecting to UDP endpoint: {:?}", socket.endpoint());
+            
+            if !socket.may_send() {
+                let send_capacity = socket.packet_send_capacity();
+                log::warn!("Not enough capacity in buffer. \nCapacity: {:?}", send_capacity);
             }
-
-            log::info!("Connected to {:?}", socket.remote_endpoint());
             control.gpio_set(0, true).await; // LED on
+            
 
             // Communication loop
             loop {
                 hid_instruction = rx_ch.receive().await;
-                let tcp_message = hid_instruction.to_be_bytes();
-                if let Err(e) = socket.write_all(&tcp_message).await {
-                    log::warn!("Write error: {:?}", e);
-                    break;
+                let udp_message = hid_instruction.to_be_bytes();
+
+                match embassy_time::with_timeout(
+                    SOCKET_TIMEOUT,
+                    socket.send_to(&udp_message, (host_addr, CONNECTION_ENDPOINT))
+                ).await {
+                    Err(_)  => {
+                        log::warn!("UDP send timeout");
+                        break
+                    }
+                    Ok(Err(e)) => {
+                        log::warn!("Write error: {:?}", e);
+                        break
+                    }
+                    Ok(Ok(_)) => log::info!("sent: {:?}", hid_instruction)
                 }
-                log::info!("sent: {:?}", hid_instruction);
             }
         }
     }

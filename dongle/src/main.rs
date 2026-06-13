@@ -27,7 +27,7 @@ use shared::{
 };
 
 use dongle::{
-    tcp_server::{network_config, tcp_server_task,},
+    udp_server::{network_config, udp_server_task},
     hid::{config_usb, hid_usb_controller}
 };
 
@@ -109,5 +109,5 @@ async fn main(spawner: Spawner) {
     // Launch hid controller with channel receiver
     unwrap!(spawner.spawn(hid_usb_controller(hid_mouse, hid_keyboard, hid_media, rx_ch)));
     // Launch TCP task with channel sender
-    unwrap!(spawner.spawn(tcp_server_task(control, stack, tx_ch)));
+    unwrap!(spawner.spawn(udp_server_task(control, stack, tx_ch)));
 }

@@ -5,7 +5,7 @@ use embassy_rp::clocks::RoscRng;
 use embassy_net::{
     Config,
     Stack,
-    tcp::TcpSocket,
+    udp::{UdpSocket, PacketMetadata},
     StackResources,
 };
 use embassy_sync::{
@@ -13,6 +13,7 @@ use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
 };
 use cyw43::JoinOptions;
+use embassy_time::Timer;
 use static_cell::StaticCell;
 
 use shared::{
@@ -48,7 +49,7 @@ pub fn network_config(net_device: cyw43::NetDriver<'static>) -> (embassy_net::St
 
 
 #[embassy_executor::task]
-pub async fn tcp_server_task(
+pub async fn udp_server_task(
     mut control: cyw43::Control<'static>, stack: Stack<'static>, tx_ch: Sender<'static, CriticalSectionRawMutex, HidInstruction, CHANNEL_SIZE>
 ) -> ! {
     /* Create access point instead of connecting to WIFI in this way:
@@ -63,7 +64,7 @@ pub async fn tcp_server_task(
     let mut buf = [0; 4096];
     */
 
-    // Try connection wifi
+    // Try network connection
     while let Err(err) = control
         .join(WIFI_NETWORK, JoinOptions::new(WIFI_PASSWORD.as_bytes()))
         .await
@@ -82,34 +83,51 @@ pub async fn tcp_server_task(
 
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
+    let mut rx_meta = [PacketMetadata::EMPTY; 16];
+    let mut tx_meta = [PacketMetadata::EMPTY; 16];
     let mut buf = [0; 4096];
+
     
     loop {
-        let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-        socket.set_timeout(Some(SOCKET_TIMEOUT));
-
-        control.gpio_set(0, false).await;
-        log::info!("Listening on TCP: {CONNECTION_ENDPOINT}...");
-        if let Err(e) = socket.accept(CONNECTION_ENDPOINT).await {
-            log::warn!("accept error: {:?}", e);
-            continue;
+        control.gpio_set(0, false).await; // LED off
+        log::info!("Listening on UDP: {CONNECTION_ENDPOINT}...");
+        
+        let mut socket = UdpSocket::new(
+            stack, &mut rx_meta, &mut rx_buffer, &mut tx_meta, &mut tx_buffer
+        );
+    
+        while let Err(e) = socket.bind(CONNECTION_ENDPOINT) {
+            log::warn!("Couldn't bind endpoint, error: {:?}", e);
+            Timer::after_millis(10).await;
+        };
+        
+        if !socket.may_recv() {
+            log::info!("Waiting for connection");
+            // Wait for connection
+            while !socket.may_recv() {
+                Timer::after_millis(10).await;
+            }
         }
 
-        log::info!("Received connection from {:?}", socket.remote_endpoint());
-        control.gpio_set(0, true).await;
+        log::info!("Received connection on endpoint {:?}", socket.endpoint());
+        control.gpio_set(0, true).await; // LED on
 
         loop {
-            // Receives data from TCP Client
-            match socket.read(&mut buf).await {
-                Err(e) => {
+            // Executes when data is received from UDP Client, Err() wraps timeout error,
+            // Ok() wraps recv Result
+            match embassy_time::with_timeout(
+                SOCKET_TIMEOUT,
+                socket.recv_from(&mut buf)
+            ).await {
+                Err(_) => {
+                    log::warn!("UDP Connection timeout");
+                    break
+                }
+                Ok(Err(e)) => {
                     log::warn!("read error: {:?}", e);
-                    break;
+                    break
                 }
-                Ok(0) => {
-                    log::warn!("read EOF");
-                    break;
-                }
-                Ok(idx) => {
+                Ok(Ok((idx, _))) => {
                     let received = &buf[..idx];
                     // log::info!("Received {} bytes: {:?}", idx, received);
                     let (chunks, _) = received.as_chunks::<16>(); // As chunks of len 16

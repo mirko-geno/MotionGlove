@@ -33,7 +33,7 @@ use glove::{
     // blinker::blink_task,
     sensors::sensor_processing,
     flexes::FingerFlexes,
-    tcp_client::{network_config, tcp_client_task},
+    udp_client::{network_config, udp_client_task},
 };
 
 
@@ -108,7 +108,7 @@ async fn main(spawner: Spawner) {
     let tx_ch = CHANNEL.sender();
     let rx_ch = CHANNEL.receiver();
 
-    unwrap!(spawner.spawn(tcp_client_task(control, stack, rx_ch)));
+    unwrap!(spawner.spawn(udp_client_task(control, stack, rx_ch)));
 
     // Instantiate ADC flex sensors
     let adc_driver   = Adc::new(p.ADC, Irqs, AdcConfig::default());
